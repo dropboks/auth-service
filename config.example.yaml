@@ -1,0 +1,23 @@
+database:
+  host:
+  user:
+  password:
+  port:
+  name:
+  sslmode:
+
+app:
+  name:
+  port:
+
+server:
+  cors:
+    allow_origins:
+    allow_methods:
+    allow_headers:
+    expose_headers:
+    max_age:
+    allow_credential:
+
+jwt:
+  secret_key:
