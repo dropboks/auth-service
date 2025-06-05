@@ -3,8 +3,8 @@ package jwt
 import (
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/dropboks/auth-service/internal/domain/dto"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/spf13/viper"
 )
 
@@ -14,9 +14,9 @@ func GenerateToken(userId string) (string, error) {
 
 	claims := &Claims{
 		UserId: userId,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expirationTime.Unix(),
-			IssuedAt:  time.Now().Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    viper.GetString("app.name"),
 		},
 	}

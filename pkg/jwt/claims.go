@@ -1,8 +1,8 @@
 package jwt
 
-import "github.com/dgrijalva/jwt-go"
+import "github.com/golang-jwt/jwt/v5"
 
 type Claims struct {
 	UserId string `json:"user_id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
