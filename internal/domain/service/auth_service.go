@@ -7,8 +7,8 @@ import (
 	"github.com/dropboks/auth-service/internal/domain/repository"
 	"github.com/dropboks/auth-service/pkg/jwt"
 	utils "github.com/dropboks/auth-service/pkg/utils"
-	fileProto "github.com/dropboks/proto-file/pkg/fpb"
-	userProto "github.com/dropboks/proto-user/pkg/upb"
+	fpb "github.com/dropboks/proto-file/pkg/fpb"
+	upb "github.com/dropboks/proto-user/pkg/upb"
 	_utils "github.com/dropboks/sharedlib/utils"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -23,13 +23,13 @@ type (
 	}
 	authService struct {
 		authRepository    repository.AuthRepository
-		userServiceClient userProto.UserServiceClient
-		fileServiceClient fileProto.FileServiceClient
+		userServiceClient upb.UserServiceClient
+		fileServiceClient fpb.FileServiceClient
 		logger            zerolog.Logger
 	}
 )
 
-func New(authRepository repository.AuthRepository, userServiceClient userProto.UserServiceClient, fileServiceClient fileProto.FileServiceClient, logger zerolog.Logger) AuthService {
+func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger) AuthService {
 	return &authService{
 		authRepository:    authRepository,
 		userServiceClient: userServiceClient,
@@ -65,7 +65,7 @@ func (a *authService) LogoutService(token string) error {
 
 func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 	c := context.Background()
-	exist, err := a.userServiceClient.GetUserByEmail(c, &userProto.Email{
+	exist, err := a.userServiceClient.GetUserByEmail(c, &upb.Email{
 		Email: req.Email,
 	})
 	if err != nil {
@@ -86,7 +86,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 		a.logger.Error().Err(err).Msg("error converting image")
 		return "", dto.Err_INTERNAL_CONVERT_IMAGE
 	}
-	imageReq := &fileProto.Image{
+	imageReq := &fpb.Image{
 		Image: image,
 	}
 	imageName, err := a.fileServiceClient.SaveProfileImage(c, imageReq)
@@ -96,7 +96,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 		return "", err
 	}
 	userId := uuid.New().String()
-	user := &userProto.User{
+	user := &upb.User{
 		Id:       userId,
 		FullName: req.FullName,
 		Image:    imageName.GetName(),
@@ -128,7 +128,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 
 func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 	c := context.Background()
-	user, err := a.userServiceClient.GetUserByEmail(c, &userProto.Email{
+	user, err := a.userServiceClient.GetUserByEmail(c, &upb.Email{
 		Email: req.Email,
 	})
 	if err != nil {

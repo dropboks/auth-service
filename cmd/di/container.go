@@ -18,10 +18,6 @@ func BuildContainer() *dig.Container {
 	if err := container.Provide(logger.New); err != nil {
 		panic("Failed to provide logger: " + err.Error())
 	}
-	// database connection
-	// if err := container.Provide(database.New); err != nil {
-	// 	panic("Failed to provide db client connection: " + err.Error())
-	// }
 	// redis client connection
 	if err := container.Provide(_cache.New); err != nil {
 		panic("Failed to provide redis client connection: " + err.Error())
