@@ -9,6 +9,8 @@ import (
 	"github.com/dropboks/sharedlib/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type (
@@ -52,6 +54,17 @@ func (a *authHandler) Login(ctx *gin.Context) {
 		} else if err == dto.Err_INTERNAL_SET_TOKEN {
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		}
+		code := status.Code(err)
+		message := status.Convert(err).Message()
+		if code == codes.Internal {
+			res := utils.ReturnResponseError(500, message)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		} else if code == codes.NotFound {
+			res := utils.ReturnResponseError(404, message)
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
 		}
 	}
