@@ -47,5 +47,4 @@ _testmain.go
 
 config.yaml
 .env
-.air.toml
 tmp
