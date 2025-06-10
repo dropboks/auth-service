@@ -8,7 +8,7 @@ func HashPasswordCompare(password, hashedPassword string) bool {
 }
 
 func HashPassword(password string) (string, error) {
-	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), 17)
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), 10) // changed cost from 17 to 10
 	if err != nil {
 		return "", err
 	}
