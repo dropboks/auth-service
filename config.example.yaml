@@ -8,7 +8,8 @@ database:
 
 app:
   name:
-  port:
+  http:
+    port:
 
 server:
   cors:

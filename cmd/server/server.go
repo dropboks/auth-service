@@ -36,10 +36,10 @@ func (s *Server) Run() {
 			defer redis.Close()
 			handler.AuthRoutes(router, ah)
 			srv := &http.Server{
-				Addr:    ":" + viper.GetString("app.port"),
+				Addr:    ":" + viper.GetString("app.http.port"),
 				Handler: router,
 			}
-			logger.Info().Msgf("App Starting in port %s", viper.GetString("app.port"))
+			logger.Info().Msgf("HTTP Server Starting in port %s", viper.GetString("app.http.port"))
 			go func() {
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					logger.Fatal().Err(err).Msg("Failed to listen and server http server")
