@@ -5,6 +5,7 @@ import (
 
 	"github.com/dropboks/auth-service/internal/domain/dto"
 	"github.com/dropboks/auth-service/internal/domain/repository"
+	"github.com/dropboks/auth-service/pkg/constant"
 	"github.com/dropboks/auth-service/pkg/jwt"
 	utils "github.com/dropboks/auth-service/pkg/utils"
 	fpb "github.com/dropboks/proto-file/pkg/fpb"
@@ -12,6 +13,8 @@ import (
 	_utils "github.com/dropboks/sharedlib/utils"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type (
@@ -64,17 +67,26 @@ func (a *authService) LogoutService(token string) error {
 }
 
 func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
+	ext := _utils.GetFileNameExtension(req.Image.Filename)
+	if ext != "jpg" && ext != "jpeg" && ext != "png" {
+		return "", dto.Err_BAD_REQUEST_WRONG_EXTENTION
+	}
+	if req.Image.Size > constant.MAX_UPLOAD_SIZE {
+		return "", dto.Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED
+	}
 	c := context.Background()
 	exist, err := a.userServiceClient.GetUserByEmail(c, &upb.Email{
 		Email: req.Email,
 	})
 	if err != nil {
-		a.logger.Error().Err(err).Msg("Error Query Get User By Email")
-		// handle error from grpc
-		return "", err
+		code := status.Code(err)
+		if code != codes.NotFound {
+			a.logger.Error().Err(err).Msg("Error Query Get User By Email")
+			return "", err
+		}
 	}
 	if exist != nil {
-		a.logger.Error().Msg("User with this email exist")
+		a.logger.Error().Str("email", req.Email).Msg("User with this email exist")
 		return "", dto.Err_CONFLICT_EMAIL_EXIST
 	}
 	password, err := utils.HashPassword(req.Password)
@@ -88,10 +100,10 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 	}
 	imageReq := &fpb.Image{
 		Image: image,
+		Ext:   ext,
 	}
 	imageName, err := a.fileServiceClient.SaveProfileImage(c, imageReq)
 	if err != nil {
-		// handle error from grpc
 		a.logger.Error().Err(err).Msg("Error uploading image to file service")
 		return "", err
 	}
@@ -105,11 +117,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 	}
 	_, err = a.userServiceClient.CreateUser(c, user)
 	if err != nil {
-		// handle grpc error
-		_, errRemove := a.fileServiceClient.RemoveProfileImage(c, imageName)
-		if errRemove != nil {
-			// handle grpc err
-		}
+		_, err := a.fileServiceClient.RemoveProfileImage(c, imageName)
 		return "", err
 	}
 	token, err := jwt.GenerateToken(userId)
@@ -117,12 +125,13 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 		a.logger.Error().Err(err).Msg("Error JWT Signing")
 		return "", dto.Err_INTENAL_JWT_SIGNING
 	}
-	sessionKey := "session:" + token
-	err = a.authRepository.SetAccessToken(c, sessionKey, token)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("Error saving token to Redis")
-		return "", dto.Err_INTERNAL_SET_TOKEN
-	}
+	go func() {
+		sessionKey := "session:" + token
+		err = a.authRepository.SetAccessToken(c, sessionKey, token)
+		if err != nil {
+			a.logger.Error().Err(err).Msg("Error saving token to Redis")
+		}
+	}()
 	return token, nil
 }
 
@@ -133,7 +142,6 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 	})
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error Query Get User By Email")
-		// handle error based on return codes from grpc
 		return "", err
 	}
 	ok := utils.HashPasswordCompare(req.Password, user.Password)
@@ -146,8 +154,6 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		a.logger.Error().Err(err).Msg("Error JWT Signing")
 		return "", dto.Err_INTENAL_JWT_SIGNING
 	}
-	// if use redis with userid as a key, just one session is registered
-	// use another key like session:token
 	sessionKey := "session:" + token
 	err = a.authRepository.SetAccessToken(c, sessionKey, token)
 	if err != nil {

@@ -116,6 +116,21 @@ func (a *authHandler) Register(ctx *gin.Context) {
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
+		} else if err == dto.Err_BAD_REQUEST_WRONG_EXTENTION {
+			res := utils.ReturnResponseError(400, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+			return
+		} else if err == dto.Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED {
+			res := utils.ReturnResponseError(400, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+			return
+		}
+		code := status.Code(err)
+		message := status.Convert(err).Message()
+		if code == codes.Internal {
+			res := utils.ReturnResponseError(500, message)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
 		}
 	}
 	res := utils.ReturnResponseSuccess(200, dto.REGISTER_SUCCESS, token)
