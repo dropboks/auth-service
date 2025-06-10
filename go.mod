@@ -5,7 +5,7 @@ go 1.24.2
 require (
 	github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf
 	github.com/dropboks/proto-user v0.0.0-20250604091659-b7b453695fab
-	github.com/dropboks/sharedlib v0.0.0-20250610013015-1bb84fc7c438
+	github.com/dropboks/sharedlib v0.0.0-20250610024558-fd48e3b2004d
 	github.com/gin-contrib/cors v1.7.5
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
