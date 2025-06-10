@@ -3,19 +3,19 @@ module github.com/dropboks/auth-service
 go 1.24.2
 
 require (
-	github.com/dropboks/proto-file v0.0.0-20250604072043-671975692954
+	github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf
 	github.com/dropboks/proto-user v0.0.0-20250604091659-b7b453695fab
-	github.com/dropboks/sharedlib v0.0.0-20250604090848-7c8f519a80f0
+	github.com/dropboks/sharedlib v0.0.0-20250610013015-1bb84fc7c438
 	github.com/gin-contrib/cors v1.7.5
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
-	github.com/redis/go-redis/v9 v9.9.0
+	github.com/redis/go-redis/v9 v9.10.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.20.1
 	go.uber.org/dig v1.19.0
-	golang.org/x/crypto v0.38.0
-	google.golang.org/grpc v1.72.2
+	golang.org/x/crypto v0.39.0
+	google.golang.org/grpc v1.73.0
 )
 
 require (
@@ -49,10 +49,10 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.14 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/arch v0.17.0 // indirect
-	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/arch v0.18.0 // indirect
+	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
