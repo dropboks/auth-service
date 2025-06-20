@@ -12,6 +12,7 @@ import (
 )
 
 func New(zerolog zerolog.Logger) *gin.Engine {
+	// gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(middleware.AccessLogger(zerolog))
 
