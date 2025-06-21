@@ -45,5 +45,6 @@ _testmain.go
 /test/times.out
 
 config.yaml
+config.local.yaml
 .env
 tmp
