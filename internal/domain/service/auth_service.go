@@ -2,17 +2,22 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
-	"github.com/dropboks/auth-service/internal/domain/dto"
+	dto "github.com/dropboks/auth-service/internal/domain/dto"
 	"github.com/dropboks/auth-service/internal/domain/repository"
 	"github.com/dropboks/auth-service/pkg/constant"
 	"github.com/dropboks/auth-service/pkg/jwt"
 	utils "github.com/dropboks/auth-service/pkg/utils"
 	fpb "github.com/dropboks/proto-file/pkg/fpb"
 	upb "github.com/dropboks/proto-user/pkg/upb"
+	_dto "github.com/dropboks/sharedlib/dto"
 	_utils "github.com/dropboks/sharedlib/utils"
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/rs/zerolog"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -29,15 +34,17 @@ type (
 		userServiceClient upb.UserServiceClient
 		fileServiceClient fpb.FileServiceClient
 		logger            zerolog.Logger
+		js                jetstream.JetStream
 	}
 )
 
-func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger) AuthService {
+func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger, js jetstream.JetStream) AuthService {
 	return &authService{
 		authRepository:    authRepository,
 		userServiceClient: userServiceClient,
 		fileServiceClient: fileServiceClient,
 		logger:            logger,
+		js:                js,
 	}
 }
 
@@ -74,8 +81,8 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 	if req.Image.Size > constant.MAX_UPLOAD_SIZE {
 		return "", dto.Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED
 	}
-	c := context.Background()
-	exist, err := a.userServiceClient.GetUserByEmail(c, &upb.Email{
+	ctx := context.Background()
+	exist, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{
 		Email: req.Email,
 	})
 	if err != nil {
@@ -102,7 +109,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 		Image: image,
 		Ext:   ext,
 	}
-	imageName, err := a.fileServiceClient.SaveProfileImage(c, imageReq)
+	imageName, err := a.fileServiceClient.SaveProfileImage(ctx, imageReq)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error uploading image to file service")
 		return "", err
@@ -115,9 +122,9 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 		Email:    req.Email,
 		Password: password,
 	}
-	_, err = a.userServiceClient.CreateUser(c, user)
+	_, err = a.userServiceClient.CreateUser(ctx, user)
 	if err != nil {
-		_, err := a.fileServiceClient.RemoveProfileImage(c, imageName)
+		_, err := a.fileServiceClient.RemoveProfileImage(ctx, imageName)
 		return "", err
 	}
 	token, err := jwt.GenerateToken(userId)
@@ -127,10 +134,29 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 	}
 	go func() {
 		sessionKey := "session:" + token
-		err = a.authRepository.SetAccessToken(c, sessionKey, token)
+		err = a.authRepository.SetAccessToken(ctx, sessionKey, token)
 		if err != nil {
 			a.logger.Error().Err(err).Msg("Error saving token to Redis")
 		}
+	}()
+
+	go func() {
+		subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), userId)
+		msg := &_dto.MailNotificationMessage{
+			Receiver: []string{user.Email},
+			MsgType:  "welcome",
+			Message:  "",
+		}
+		marshalledMsg, err := json.Marshal(msg)
+		if err != nil {
+			a.logger.Error().Err(err).Msg("marshal data error")
+			return
+		}
+		_, err = a.js.Publish(ctx, subject, []byte(marshalledMsg))
+		if err != nil {
+			a.logger.Error().Err(err).Msg("publish notification error")
+		}
+
 	}()
 	return token, nil
 }
