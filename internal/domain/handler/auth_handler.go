@@ -67,6 +67,9 @@ func (a *authHandler) Login(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
 		}
+		res := utils.ReturnResponseError(500, message)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
 	}
 	res := utils.ReturnResponseSuccess(200, dto.LOGIN_SUCCESS, token)
 	ctx.JSON(http.StatusOK, res)
@@ -132,6 +135,9 @@ func (a *authHandler) Register(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
+		res := utils.ReturnResponseError(500, message)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
 	}
 	res := utils.ReturnResponseSuccess(200, dto.REGISTER_SUCCESS, token)
 	ctx.JSON(http.StatusOK, res)
