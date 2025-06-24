@@ -3,6 +3,7 @@ package di
 import (
 	_cache "github.com/dropboks/auth-service/config/cache"
 	"github.com/dropboks/auth-service/config/logger"
+	mq "github.com/dropboks/auth-service/config/message-queue"
 	"github.com/dropboks/auth-service/config/router"
 	"github.com/dropboks/auth-service/internal/domain/handler"
 	"github.com/dropboks/auth-service/internal/domain/repository"
@@ -17,6 +18,14 @@ func BuildContainer() *dig.Container {
 	// logger instance
 	if err := container.Provide(logger.New); err != nil {
 		panic("Failed to provide logger: " + err.Error())
+	}
+	// nats client connection
+	if err := container.Provide(mq.New); err != nil {
+		panic("Failed to provide nats connection: " + err.Error())
+	}
+	// jetstream connection
+	if err := container.Provide(mq.NewJetstream); err != nil {
+		panic("Failed to provide jetstream connection: " + err.Error())
 	}
 	// redis client connection
 	if err := container.Provide(_cache.New); err != nil {

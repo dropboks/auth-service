@@ -12,6 +12,7 @@ import (
 	"github.com/dropboks/auth-service/internal/domain/handler"
 	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
 	"github.com/gin-gonic/gin"
+	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
@@ -30,16 +31,20 @@ func (s *Server) Run() {
 			router *gin.Engine,
 			grpcClientManager *grpc.GRPCClientManager,
 			redis *redis.Client,
+			nc *nats.Conn,
 			ah handler.AuthHandler,
 		) {
 			defer grpcClientManager.CloseAllConnections()
 			defer redis.Close()
+			defer nc.Drain()
+
 			handler.AuthRoutes(router, ah)
 			srv := &http.Server{
 				Addr:    ":" + viper.GetString("app.http.port"),
 				Handler: router,
 			}
 			logger.Info().Msgf("HTTP Server Starting in port %s", viper.GetString("app.http.port"))
+
 			go func() {
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					logger.Fatal().Err(err).Msg("Failed to listen and server http server")
