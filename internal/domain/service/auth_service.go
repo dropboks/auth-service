@@ -31,6 +31,7 @@ type (
 		LogoutService(token string) error
 		VerifyEmailService(userId, token string) error
 		ResendVerificationService(email string) error
+		VerifyOTPService(otp, email string) (string, error)
 	}
 	authService struct {
 		authRepository    repository.AuthRepository
@@ -49,6 +50,44 @@ func New(authRepository repository.AuthRepository, userServiceClient upb.UserSer
 		logger:            logger,
 		js:                js,
 	}
+
+}
+
+func (a *authService) VerifyOTPService(otp, email string) (string, error) {
+	ctx := context.Background()
+	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
+	if err != nil {
+		a.logger.Error().Err(err).Msg("error from user_service")
+		return "", err
+	}
+	key := fmt.Sprintf("OTP:%s", user.GetId())
+	rOTP, err := a.authRepository.GetResource(ctx, key)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("error get otp from Redis")
+		return "", err
+	}
+	if rOTP != otp {
+		a.logger.Error().Err(dto.Err_UNAUTHORIZED_OTP_INVALID).Msg("OTP is not valid")
+		return "", dto.Err_UNAUTHORIZED_OTP_INVALID
+	}
+	err = a.authRepository.RemoveResource(ctx, key)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("error remove otp from Redis")
+		return "", err
+	}
+
+	token, err := jwt.GenerateToken(user.Id)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("error JWT Signing")
+		return "", dto.Err_INTENAL_JWT_SIGNING
+	}
+	sessionKey := "session:" + user.GetId()
+	err = a.authRepository.SetResource(ctx, sessionKey, token, 1*time.Hour)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("error saving token to Redis")
+		return "", err
+	}
+	return token, nil
 }
 
 func (a *authService) ResendVerificationService(email string) error {
@@ -63,7 +102,7 @@ func (a *authService) ResendVerificationService(email string) error {
 	verificationToken, err := utils.RandomString64()
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error generate verification token")
-	return dto.Err_INTERNAL_GENERATE_TOKEN
+		return dto.Err_INTERNAL_GENERATE_TOKEN
 	}
 	key := fmt.Sprintf("verificationToken:%s", user.GetId())
 	a.authRepository.SetResource(ctx, key, verificationToken, 30*time.Minute)
@@ -281,7 +320,6 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		a.authRepository.SetResource(c, key, otp, 2*time.Minute)
 
 		go func() {
-
 			subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.Id)
 			msg := &_dto.MailNotificationMessage{
 				Receiver: []string{user.Email},
@@ -306,7 +344,6 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		a.logger.Error().Err(err).Msg("Error JWT Signing")
 		return "", dto.Err_INTENAL_JWT_SIGNING
 	}
-	// change to userId
 	sessionKey := "session:" + user.GetId()
 	err = a.authRepository.SetResource(c, sessionKey, token, 1*time.Hour)
 	if err != nil {

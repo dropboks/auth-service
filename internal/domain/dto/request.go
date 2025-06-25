@@ -13,7 +13,11 @@ type (
 		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
-	ResendVerification struct {
+	ResendVerificationRequest struct {
 		Email string `json:"email" binding:"required"`
+	}
+	VerifyOTPRequest struct {
+		Email string `json:"email" binding:"required"`
+		OTP   string `json:"otp" binding:"required"`
 	}
 )

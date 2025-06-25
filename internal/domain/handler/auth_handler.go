@@ -21,6 +21,7 @@ type (
 		Verify(ctx *gin.Context)
 		VerifyEmail(ctx *gin.Context)
 		ResendVerficationEmail(ctx *gin.Context)
+		VerifyOTP(ctx *gin.Context)
 	}
 	authHandler struct {
 		authService service.AuthService
@@ -35,8 +36,41 @@ func New(authService service.AuthService, logger zerolog.Logger) AuthHandler {
 	}
 }
 
+func (a *authHandler) VerifyOTP(ctx *gin.Context) {
+	var req dto.VerifyOTPRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		res := utils.ReturnResponseError(http.StatusBadRequest, "missing otp")
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+	token, err := a.authService.VerifyOTPService(req.OTP, req.Email)
+	if err != nil {
+		if err == dto.Err_UNAUTHORIZED_OTP_INVALID {
+			res := utils.ReturnResponseError(401, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+			return
+		}
+		code := status.Code(err)
+		message := status.Convert(err).Message()
+		if code == codes.NotFound {
+			res := utils.ReturnResponseError(404, message)
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
+			return
+		} else if code == codes.Internal {
+			res := utils.ReturnResponseError(500, message)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		}
+		res := utils.ReturnResponseError(500, err.Error())
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
+	}
+	res := utils.ReturnResponseSuccess(200, dto.OTP_VERIFICATION_SUCCESS, token)
+	ctx.JSON(http.StatusOK, res)
+}
+
 func (a *authHandler) ResendVerficationEmail(ctx *gin.Context) {
-	var req dto.ResendVerification
+	var req dto.ResendVerificationRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		res := utils.ReturnResponseError(http.StatusBadRequest, "missing email")
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
@@ -164,7 +198,7 @@ func (a *authHandler) Login(ctx *gin.Context) {
 		return
 	}
 	if token == "" {
-		res := utils.ReturnResponseSuccess(200, dto.LOGIN_SUCCESS)
+		res := utils.ReturnResponseSuccess(200, dto.OTP_SENT_SUCCESS)
 		ctx.JSON(http.StatusOK, res)
 		return
 	}

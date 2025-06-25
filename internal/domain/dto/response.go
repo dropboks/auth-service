@@ -7,6 +7,8 @@ var (
 	VERIFICATION_SUCCESS        = "Verification Success"
 	REGISTER_SUCCESS            = "Register Success. Check your email for verification."
 	RESEND_VERIFICATION_SUCCESS = "Check your email for verification"
+	OTP_VERIFICATION_SUCCESS    = "OTP is Valid"
+	OTP_SENT_SUCCESS            = "OTP Has been sent to linked email"
 )
 
 var (
@@ -21,6 +23,7 @@ var (
 	Err_UNAUTHORIZED_JWT_INVALID                = errors.New("token is invalid")
 	Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID = errors.New("token is invalid")
 	Err_UNAUTHORIZED_USER_NOT_VERIFIED          = errors.New("user is not verified")
+	Err_UNAUTHORIZED_OTP_INVALID                = errors.New("OTP is invalid")
 
 	Err_NOTFOUND_KEY_NOTFOUND = errors.New("resource is not found")
 
