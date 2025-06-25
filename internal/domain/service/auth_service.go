@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	dto "github.com/dropboks/auth-service/internal/domain/dto"
 	"github.com/dropboks/auth-service/internal/domain/repository"
@@ -25,9 +26,10 @@ import (
 type (
 	AuthService interface {
 		LoginService(req dto.LoginRequest) (string, error)
-		RegisterService(req dto.RegisterRequest) (string, error)
+		RegisterService(req dto.RegisterRequest) error
 		VerifyService(token string) (string, error)
 		LogoutService(token string) error
+		VerifyEmailService(userId, token string) error
 	}
 	authService struct {
 		authRepository    repository.AuthRepository
@@ -48,38 +50,83 @@ func New(authRepository repository.AuthRepository, userServiceClient upb.UserSer
 	}
 }
 
-func (a *authService) VerifyService(token string) (string, error) {
-	c := context.Background()
-	key := "session:" + token
-	err := a.authRepository.CheckAccessToken(c, key)
+func (a *authService) VerifyEmailService(userId string, token string) error {
+	ctx := context.Background()
+	key := fmt.Sprintf("verificationToken:%s", userId)
+	user, err := a.userServiceClient.GetUserByUserId(ctx, &upb.UserId{UserId: userId})
 	if err != nil {
-		return "", err
+		return err
 	}
-	claims, err := jwt.ValidateJWT(token)
+	if user.GetVerified() {
+		return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
+	}
+	rToken, err := a.authRepository.GetResource(ctx, key)
 	if err != nil {
-		a.logger.Error().Err(err).Msg("invalid jwt")
-		return "", err
+		return err
 	}
-	return claims.UserId, nil
-}
-
-func (a *authService) LogoutService(token string) error {
-	c := context.Background()
-	key := "session:" + token
-	err := a.authRepository.RemoveAccessToken(c, key)
+	if token != rToken {
+		return dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID
+	}
+	updatedUser := &upb.User{
+		Id:               user.GetId(),
+		FullName:         user.GetFullName(),
+		Image:            _utils.StringPtr(user.GetImage()),
+		Email:            user.GetEmail(),
+		Password:         user.GetPassword(),
+		Verified:         true,
+		TwoFactorEnabled: false,
+	}
+	_, err = a.userServiceClient.UpdateUser(ctx, updatedUser)
+	if err != nil {
+		return err
+	}
+	err = a.authRepository.RemoveResource(ctx, key)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
-	ext := _utils.GetFileNameExtension(req.Image.Filename)
-	if ext != "jpg" && ext != "jpeg" && ext != "png" {
-		return "", dto.Err_BAD_REQUEST_WRONG_EXTENTION
+func (a *authService) VerifyService(token string) (string, error) {
+	c := context.Background()
+	claims, err := jwt.ValidateJWT(token)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("invalid jwt")
+		return "", err
 	}
-	if req.Image.Size > constant.MAX_UPLOAD_SIZE {
-		return "", dto.Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED
+
+	key := "session:" + claims.UserId
+	rToken, err := a.authRepository.GetResource(c, key)
+	if err != nil {
+		return "", err
+	}
+	if token != rToken {
+		return "", dto.Err_UNAUTHORIZED_JWT_INVALID
+	}
+
+	return claims.UserId, nil
+}
+
+func (a *authService) LogoutService(token string) error {
+	c := context.Background()
+	key := "session:" + token
+	err := a.authRepository.RemoveResource(c, key)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *authService) RegisterService(req dto.RegisterRequest) error {
+	ext := ""
+	if req.Image != nil && req.Image.Filename != "" {
+		ext = _utils.GetFileNameExtension(req.Image.Filename)
+		if ext != "jpg" && ext != "jpeg" && ext != "png" {
+			return dto.Err_BAD_REQUEST_WRONG_EXTENTION
+		}
+		if req.Image.Size > constant.MAX_UPLOAD_SIZE {
+			return dto.Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED
+		}
 	}
 	ctx := context.Background()
 	exist, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{
@@ -89,63 +136,69 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 		code := status.Code(err)
 		if code != codes.NotFound {
 			a.logger.Error().Err(err).Msg("Error Query Get User By Email")
-			return "", err
+			return err
 		}
 	}
 	if exist != nil {
 		a.logger.Error().Str("email", req.Email).Msg("User with this email exist")
-		return "", dto.Err_CONFLICT_EMAIL_EXIST
+		return dto.Err_CONFLICT_EMAIL_EXIST
 	}
 	password, err := utils.HashPassword(req.Password)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error hashing password")
 	}
-	image, err := _utils.FileToByte(req.Image)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("error converting image")
-		return "", dto.Err_INTERNAL_CONVERT_IMAGE
+
+	var imageName *string
+	if req.Image != nil && req.Image.Filename != "" {
+		image, err := _utils.FileToByte(req.Image)
+		if err != nil {
+			a.logger.Error().Err(err).Msg("error converting image")
+			return dto.Err_INTERNAL_CONVERT_IMAGE
+		}
+		imageReq := &fpb.Image{
+			Image: image,
+			Ext:   ext,
+		}
+		resp, err := a.fileServiceClient.SaveProfileImage(ctx, imageReq)
+		if err != nil {
+			a.logger.Error().Err(err).Msg("Error uploading image to file service")
+			return err
+		}
+		imageName = _utils.StringPtr(resp.GetName())
+	} else {
+		imageName = nil
 	}
-	imageReq := &fpb.Image{
-		Image: image,
-		Ext:   ext,
-	}
-	imageName, err := a.fileServiceClient.SaveProfileImage(ctx, imageReq)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("Error uploading image to file service")
-		return "", err
-	}
+
 	userId := uuid.New().String()
 	user := &upb.User{
 		Id:       userId,
 		FullName: req.FullName,
-		Image:    imageName.GetName(),
+		Image:    imageName,
 		Email:    req.Email,
 		Password: password,
 	}
 	_, err = a.userServiceClient.CreateUser(ctx, user)
-	if err != nil {
-		_, err := a.fileServiceClient.RemoveProfileImage(ctx, imageName)
-		return "", err
+	if err != nil && req.Image != nil && req.Image.Filename != "" {
+		_, err := a.fileServiceClient.RemoveProfileImage(ctx, &fpb.ImageName{Name: *imageName})
+		return err
 	}
-	token, err := jwt.GenerateToken(userId)
+	verificationToken, err := utils.RandomString64()
 	if err != nil {
-		a.logger.Error().Err(err).Msg("Error JWT Signing")
-		return "", dto.Err_INTENAL_JWT_SIGNING
+		a.logger.Error().Err(err).Msg("error generate verification token")
+		return dto.Err_INTERNAL_GENERATE_TOKEN
 	}
-	go func() {
-		sessionKey := "session:" + token
-		err = a.authRepository.SetAccessToken(ctx, sessionKey, token)
-		if err != nil {
-			a.logger.Error().Err(err).Msg("Error saving token to Redis")
-		}
-	}()
+
+	key := fmt.Sprintf("verificationToken:%s", userId)
+	a.authRepository.SetResource(ctx, key, verificationToken, 30*time.Minute)
 
 	go func() {
+
+		link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), "auth/verify-email?", userId, verificationToken)
 		subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), userId)
 		msg := &_dto.MailNotificationMessage{
 			Receiver: []string{user.Email},
-			MsgType:  "welcome",
-			Message:  "",
+			MsgType:  "verification",
+			Message:  link,
 		}
 		marshalledMsg, err := json.Marshal(msg)
 		if err != nil {
@@ -156,9 +209,8 @@ func (a *authService) RegisterService(req dto.RegisterRequest) (string, error) {
 		if err != nil {
 			a.logger.Error().Err(err).Msg("publish notification error")
 		}
-
 	}()
-	return token, nil
+	return nil
 }
 
 func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
@@ -170,21 +222,59 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		a.logger.Error().Err(err).Msg("Error Query Get User By Email")
 		return "", err
 	}
+
+	if !user.Verified {
+		a.logger.Error().Msgf("user not verified :%s", user.GetEmail())
+		return "", dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
+	}
+
 	ok := utils.HashPasswordCompare(req.Password, user.Password)
 	if !ok {
 		a.logger.Error().Err(err).Msg("Password doesn't match")
 		return "", dto.Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH
 	}
+
+	if user.TwoFactorEnabled {
+		otp, err := utils.GenerateOTP()
+		if err != nil {
+			a.logger.Error().Err(err).Msg("generate OTP error")
+			return "", dto.Err_INTERNAL_GENERATE_OTP
+		}
+		key := fmt.Sprintf("OTP:%s", user.Id)
+		a.authRepository.SetResource(c, key, otp, 2*time.Minute)
+
+		go func() {
+
+			subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.Id)
+			msg := &_dto.MailNotificationMessage{
+				Receiver: []string{user.Email},
+				MsgType:  "OTP",
+				Message:  otp,
+			}
+			marshalledMsg, err := json.Marshal(msg)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("marshal data error")
+				return
+			}
+			_, err = a.js.Publish(c, subject, []byte(marshalledMsg))
+			if err != nil {
+				a.logger.Error().Err(err).Msg("publish notification error")
+			}
+		}()
+		return "", nil
+	}
+
 	token, err := jwt.GenerateToken(user.Id)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error JWT Signing")
 		return "", dto.Err_INTENAL_JWT_SIGNING
 	}
-	sessionKey := "session:" + token
-	err = a.authRepository.SetAccessToken(c, sessionKey, token)
+	// change to userId
+	sessionKey := "session:" + user.GetId()
+	err = a.authRepository.SetResource(c, sessionKey, token, 1*time.Hour)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error saving token to Redis")
-		return "", dto.Err_INTERNAL_SET_TOKEN
+		return "", err
 	}
 	return token, nil
 }

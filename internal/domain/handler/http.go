@@ -11,6 +11,7 @@ func AuthRoutes(r *gin.Engine, ah AuthHandler) *gin.RouterGroup {
 		auth.POST("/register", ah.Register)
 		auth.POST("/verify", ah.Verify)
 		auth.POST("/logout", ah.Logout)
+		auth.GET("/verify-email", ah.VerifyEmail)
 	}
 	return auth
 }

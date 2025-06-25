@@ -19,6 +19,7 @@ type (
 		Register(ctx *gin.Context)
 		Logout(ctx *gin.Context)
 		Verify(ctx *gin.Context)
+		VerifyEmail(ctx *gin.Context)
 	}
 	authHandler struct {
 		authService service.AuthService
@@ -31,6 +32,51 @@ func New(authService service.AuthService, logger zerolog.Logger) AuthHandler {
 		authService: authService,
 		logger:      logger,
 	}
+}
+
+func (a *authHandler) VerifyEmail(ctx *gin.Context) {
+	userId := ctx.Query("userid")
+	token := ctx.Query("token")
+	if userId == "" || token == "" {
+		res := utils.ReturnResponseError(http.StatusBadRequest, "userid and token are required")
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+	if err := a.authService.VerifyEmailService(userId, token); err != nil {
+		if err == dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID {
+			res := utils.ReturnResponseError(401, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+			return
+		} else if err == dto.Err_CONFLICT_USER_ALREADY_VERIFIED {
+			res := utils.ReturnResponseError(409, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusConflict, res)
+			return
+		} else if err == dto.Err_NOTFOUND_KEY_NOTFOUND {
+			res := utils.ReturnResponseError(404, "verification token is not found")
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
+			return
+		} else if err == dto.Err_INTERNAL_DELETE_RESOURCE {
+			res := utils.ReturnResponseError(500, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		}
+		code := status.Code(err)
+		message := status.Convert(err).Message()
+		if code == codes.NotFound {
+			res := utils.ReturnResponseError(404, message)
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
+			return
+		} else if code == codes.Internal {
+			res := utils.ReturnResponseError(500, message)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		}
+		res := utils.ReturnResponseError(500, message)
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
+	}
+	res := utils.ReturnResponseSuccess(200, dto.VERIFICATION_SUCCESS)
+	ctx.JSON(http.StatusOK, res)
 }
 
 func (a *authHandler) Login(ctx *gin.Context) {
@@ -47,50 +93,45 @@ func (a *authHandler) Login(ctx *gin.Context) {
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
+		} else if err == dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED {
+			res := utils.ReturnResponseError(401, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+			return
 		} else if err == dto.Err_INTENAL_JWT_SIGNING {
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
-		} else if err == dto.Err_INTERNAL_SET_TOKEN {
-			res := utils.ReturnResponseError(500, err.Error())
+		} else if err == dto.Err_INTERNAL_SET_RESOURCE {
+			res := utils.ReturnResponseError(500, "failed to set token")
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		} else if err == dto.Err_INTERNAL_GENERATE_OTP {
+			res := utils.ReturnResponseError(500, "failed to set token")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
 		code := status.Code(err)
 		message := status.Convert(err).Message()
-		if code == codes.Internal {
-			res := utils.ReturnResponseError(500, message)
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
-			return
-		} else if code == codes.NotFound {
+		if code == codes.NotFound {
 			res := utils.ReturnResponseError(404, message)
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
+			return
+		} else if code == codes.Internal {
+			res := utils.ReturnResponseError(500, message)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
 		res := utils.ReturnResponseError(500, message)
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 		return
 	}
-	res := utils.ReturnResponseSuccess(200, dto.LOGIN_SUCCESS, token)
-	ctx.JSON(http.StatusOK, res)
-}
-
-func (a *authHandler) Logout(ctx *gin.Context) {
-	token := ctx.GetHeader("Authorization")
 	if token == "" {
-		ctx.AbortWithStatusJSON(http.StatusUnauthorized, "Token is missing")
+		res := utils.ReturnResponseSuccess(200, dto.LOGIN_SUCCESS)
+		ctx.JSON(http.StatusOK, res)
 		return
 	}
-	token = token[7:]
-	err := a.authService.LogoutService(token)
-	if err != nil {
-		if err == dto.Err_INTERNAL_DELETE_TOKEN {
-			res := utils.ReturnResponseError(500, err.Error())
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
-			return
-		}
-	}
-	ctx.Status(http.StatusNoContent)
+	res := utils.ReturnResponseSuccess(200, dto.LOGIN_SUCCESS, token)
+	ctx.JSON(http.StatusOK, res)
 }
 
 func (a *authHandler) Register(ctx *gin.Context) {
@@ -101,21 +142,13 @@ func (a *authHandler) Register(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}
-	token, err := a.authService.RegisterService(req)
+	err := a.authService.RegisterService(req)
 	if err != nil {
 		if err == dto.Err_CONFLICT_EMAIL_EXIST {
 			res := utils.ReturnResponseError(409, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusConflict, res)
 			return
 		} else if err == dto.Err_INTERNAL_CONVERT_IMAGE {
-			res := utils.ReturnResponseError(500, err.Error())
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
-			return
-		} else if err == dto.Err_INTENAL_JWT_SIGNING {
-			res := utils.ReturnResponseError(500, err.Error())
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
-			return
-		} else if err == dto.Err_INTERNAL_SET_TOKEN {
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
@@ -127,6 +160,18 @@ func (a *authHandler) Register(ctx *gin.Context) {
 			res := utils.ReturnResponseError(400, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 			return
+		} else if err == dto.Err_INTENAL_JWT_SIGNING {
+			res := utils.ReturnResponseError(500, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		} else if err == dto.Err_INTERNAL_SET_RESOURCE {
+			res := utils.ReturnResponseError(500, "failed to set verification token")
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		} else if err == dto.Err_INTERNAL_GENERATE_TOKEN {
+			res := utils.ReturnResponseError(500, "failed to set verification token")
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
 		}
 		code := status.Code(err)
 		message := status.Convert(err).Message()
@@ -139,7 +184,7 @@ func (a *authHandler) Register(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 		return
 	}
-	res := utils.ReturnResponseSuccess(200, dto.REGISTER_SUCCESS, token)
+	res := utils.ReturnResponseSuccess(200, dto.REGISTER_SUCCESS)
 	ctx.JSON(http.StatusOK, res)
 }
 
@@ -156,16 +201,34 @@ func (a *authHandler) Verify(ctx *gin.Context) {
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
-		} else if err == dto.Err_INTERNAL_GET_TOKEN {
-			res := utils.ReturnResponseError(500, err.Error())
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
-			return
 		} else if err == dto.Err_UNAUTHORIZED_JWT_INVALID {
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
+		} else if err == dto.Err_INTERNAL_GET_RESOURCE {
+			res := utils.ReturnResponseError(500, "failed to get token")
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
 		}
 	}
 	ctx.Header("User-Data", fmt.Sprintf(`{"user_id":"%s"}`, userId))
+	ctx.Status(http.StatusNoContent)
+}
+
+func (a *authHandler) Logout(ctx *gin.Context) {
+	token := ctx.GetHeader("Authorization")
+	if token == "" {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, "Token is missing")
+		return
+	}
+	token = token[7:]
+	err := a.authService.LogoutService(token)
+	if err != nil {
+		if err == dto.Err_INTERNAL_DELETE_RESOURCE {
+			res := utils.ReturnResponseError(500, "failed to delete token")
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		}
+	}
 	ctx.Status(http.StatusNoContent)
 }
