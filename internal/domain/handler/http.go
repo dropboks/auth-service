@@ -4,14 +4,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func AuthRoutes(r *gin.Engine, ah AuthHandler) *gin.RouterGroup {
-	auth := r.Group("/auth")
+func AuthRoutes(r *gin.Engine, ah AuthHandler) *gin.Engine {
 	{
-		auth.POST("/login", ah.Login)
-		auth.POST("/register", ah.Register)
-		auth.POST("/verify", ah.Verify)
-		auth.POST("/logout", ah.Logout)
-		auth.GET("/verify-email", ah.VerifyEmail)
+		r.POST("/login", ah.Login)
+		r.POST("/register", ah.Register)
+		r.POST("/verify", ah.Verify)
+		r.POST("/logout", ah.Logout)
+		r.GET("/verify-email", ah.VerifyEmail)
 	}
-	return auth
+	return r
 }
