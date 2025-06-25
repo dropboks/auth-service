@@ -12,9 +12,9 @@ import (
 
 type (
 	AuthRepository interface {
-		SetAccessToken(context.Context, string, string) error
-		RemoveAccessToken(context.Context, string) error
-		CheckAccessToken(context.Context, string) error
+		GetResource(context.Context, string) (string, error)
+		SetResource(context.Context, string, string, time.Duration) error
+		RemoveResource(context.Context, string) error
 	}
 	authRepository struct {
 		redisClient cache.RedisCache
@@ -29,28 +29,28 @@ func New(r cache.RedisCache, logger zerolog.Logger) AuthRepository {
 	}
 }
 
-func (a *authRepository) CheckAccessToken(c context.Context, key string) error {
-	_, err := a.redisClient.Get(c, key)
+func (a *authRepository) GetResource(c context.Context, key string) (string, error) {
+	v, err := a.redisClient.Get(c, key)
 	if err != nil {
 		if err == redis.Nil {
-			return dto.Err_NOTFOUND_KEY_NOTFOUND
+			return "", dto.Err_NOTFOUND_KEY_NOTFOUND
 		}
-		return dto.Err_INTERNAL_GET_TOKEN
+		return "", dto.Err_INTERNAL_GET_RESOURCE
 	}
-	return nil
+	return v, nil
 }
 
-func (a *authRepository) RemoveAccessToken(c context.Context, key string) error {
+func (a *authRepository) RemoveResource(c context.Context, key string) error {
 	if err := a.redisClient.Delete(c, key); err != nil {
-		return dto.Err_INTERNAL_DELETE_TOKEN
+		return dto.Err_INTERNAL_DELETE_RESOURCE
 	}
 	return nil
 }
 
-func (a *authRepository) SetAccessToken(c context.Context, key, value string) error {
-	err := a.redisClient.Set(c, key, value, 1*time.Hour)
+func (a *authRepository) SetResource(c context.Context, key, value string, duration time.Duration) error {
+	err := a.redisClient.Set(c, key, value, duration)
 	if err != nil {
-		return err
+		return dto.Err_INTERNAL_SET_RESOURCE
 	}
 	return nil
 }
