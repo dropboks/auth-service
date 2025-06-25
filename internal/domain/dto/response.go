@@ -3,9 +3,10 @@ package dto
 import "errors"
 
 var (
-	LOGIN_SUCCESS        = "Login Success"
-	VERIFICATION_SUCCESS = "Verification Success"
-	REGISTER_SUCCESS     = "Register Success. Check your email for verification."
+	LOGIN_SUCCESS               = "Login Success"
+	VERIFICATION_SUCCESS        = "Verification Success"
+	REGISTER_SUCCESS            = "Register Success. Check your email for verification."
+	RESEND_VERIFICATION_SUCCESS = "Check your email for verification"
 )
 
 var (
@@ -30,4 +31,5 @@ var (
 	Err_INTERNAL_CONVERT_IMAGE   = errors.New("error processing image")
 	Err_INTERNAL_GENERATE_TOKEN  = errors.New("error generate verification token")
 	Err_INTERNAL_GENERATE_OTP    = errors.New("error generate OTP")
+	Err_INTERNAL_PUBLISH_MESSAGE = errors.New("error publish email")
 )

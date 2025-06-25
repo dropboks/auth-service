@@ -30,6 +30,7 @@ type (
 		VerifyService(token string) (string, error)
 		LogoutService(token string) error
 		VerifyEmailService(userId, token string) error
+		ResendVerificationService(email string) error
 	}
 	authService struct {
 		authRepository    repository.AuthRepository
@@ -48,6 +49,42 @@ func New(authRepository repository.AuthRepository, userServiceClient upb.UserSer
 		logger:            logger,
 		js:                js,
 	}
+}
+
+func (a *authService) ResendVerificationService(email string) error {
+	ctx := context.Background()
+	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
+	if err != nil {
+		return err
+	}
+	if user.GetVerified() {
+		return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
+	}
+	verificationToken, err := utils.RandomString64()
+	if err != nil {
+		a.logger.Error().Err(err).Msg("error generate verification token")
+	return dto.Err_INTERNAL_GENERATE_TOKEN
+	}
+	key := fmt.Sprintf("verificationToken:%s", user.GetId())
+	a.authRepository.SetResource(ctx, key, verificationToken, 30*time.Minute)
+	link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), "auth/verify-email?", user.GetId(), verificationToken)
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.GetId())
+	msg := &_dto.MailNotificationMessage{
+		Receiver: []string{email},
+		MsgType:  "verification",
+		Message:  link,
+	}
+	marshalledMsg, err := json.Marshal(msg)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("marshal data error")
+		return err
+	}
+	_, err = a.js.Publish(ctx, subject, []byte(marshalledMsg))
+	if err != nil {
+		a.logger.Error().Err(err).Msg("publish notification error")
+		return dto.Err_INTERNAL_PUBLISH_MESSAGE
+	}
+	return nil
 }
 
 func (a *authService) VerifyEmailService(userId string, token string) error {

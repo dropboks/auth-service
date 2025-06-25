@@ -20,6 +20,7 @@ type (
 		Logout(ctx *gin.Context)
 		Verify(ctx *gin.Context)
 		VerifyEmail(ctx *gin.Context)
+		ResendVerficationEmail(ctx *gin.Context)
 	}
 	authHandler struct {
 		authService service.AuthService
@@ -32,6 +33,43 @@ func New(authService service.AuthService, logger zerolog.Logger) AuthHandler {
 		authService: authService,
 		logger:      logger,
 	}
+}
+
+func (a *authHandler) ResendVerficationEmail(ctx *gin.Context) {
+	var req dto.ResendVerification
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		res := utils.ReturnResponseError(http.StatusBadRequest, "missing email")
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+	if err := a.authService.ResendVerificationService(req.Email); err != nil {
+		if err == dto.Err_CONFLICT_USER_ALREADY_VERIFIED {
+			res := utils.ReturnResponseError(409, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusConflict, res)
+			return
+		} else if err == dto.Err_INTERNAL_GENERATE_TOKEN || err == dto.Err_INTERNAL_PUBLISH_MESSAGE {
+			res := utils.ReturnResponseError(500, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		}
+
+		code := status.Code(err)
+		message := status.Convert(err).Message()
+		if code == codes.NotFound {
+			res := utils.ReturnResponseError(404, message)
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
+			return
+		} else if code == codes.Internal {
+			res := utils.ReturnResponseError(500, message)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		}
+		res := utils.ReturnResponseError(500, err.Error())
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
+	}
+	res := utils.ReturnResponseSuccess(200, dto.RESEND_VERIFICATION_SUCCESS)
+	ctx.JSON(http.StatusOK, res)
 }
 
 func (a *authHandler) VerifyEmail(ctx *gin.Context) {
@@ -71,7 +109,7 @@ func (a *authHandler) VerifyEmail(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
-		res := utils.ReturnResponseError(500, message)
+		res := utils.ReturnResponseError(500, err.Error())
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 		return
 	}
@@ -121,7 +159,7 @@ func (a *authHandler) Login(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
-		res := utils.ReturnResponseError(500, message)
+		res := utils.ReturnResponseError(500, err.Error())
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 		return
 	}
@@ -180,7 +218,7 @@ func (a *authHandler) Register(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
-		res := utils.ReturnResponseError(500, message)
+		res := utils.ReturnResponseError(500, err.Error())
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 		return
 	}
@@ -210,6 +248,9 @@ func (a *authHandler) Verify(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
+		res := utils.ReturnResponseError(500, err.Error())
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
 	}
 	ctx.Header("User-Data", fmt.Sprintf(`{"user_id":"%s"}`, userId))
 	ctx.Status(http.StatusNoContent)
@@ -229,6 +270,10 @@ func (a *authHandler) Logout(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
+
+		res := utils.ReturnResponseError(500, err.Error())
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
 	}
 	ctx.Status(http.StatusNoContent)
 }
