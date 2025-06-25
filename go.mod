@@ -4,14 +4,14 @@ go 1.24.2
 
 require (
 	github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf
-	github.com/dropboks/proto-user v0.0.0-20250604091659-b7b453695fab
-	github.com/dropboks/sharedlib v0.0.0-20250624031638-a37fddbd1cf5
+	github.com/dropboks/proto-user v0.0.0-20250625031838-748bd8c8e9b5
+	github.com/dropboks/sharedlib v0.0.0-20250625032026-e7ade604e67e
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/nats-io/nats.go v1.43.0
-	github.com/redis/go-redis/v9 v9.10.0
+	github.com/redis/go-redis/v9 v9.11.0
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.20.1
 	go.uber.org/dig v1.19.0

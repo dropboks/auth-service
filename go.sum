@@ -22,6 +22,12 @@ github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf h1:w1OJZ9TkC62
 github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf/go.mod h1:stfWzJh9Wmm3h5WqjQxMlEJFeUzWOlld4sc8HZrvYd4=
 github.com/dropboks/proto-user v0.0.0-20250604091659-b7b453695fab h1:ko91S2hQwTdoRjFh+nGiRM4Gn6S7IZk04jFcgT/eF8o=
 github.com/dropboks/proto-user v0.0.0-20250604091659-b7b453695fab/go.mod h1:zTOxvAVmer5UQ4b8LKj8O4unvnA57i1NvO5rpsKflrA=
+github.com/dropboks/proto-user v0.0.0-20250624070935-04a974b69472 h1:94bvwSUhrmLexIYS329ZLmV5X3eQv8X81ccfBXxsO4s=
+github.com/dropboks/proto-user v0.0.0-20250624070935-04a974b69472/go.mod h1:zTOxvAVmer5UQ4b8LKj8O4unvnA57i1NvO5rpsKflrA=
+github.com/dropboks/proto-user v0.0.0-20250625014714-494533a5eba9 h1:0aFYne5hzIYCiA4dAPDzModmu2ZGYVaKPzmVJQJi6Wo=
+github.com/dropboks/proto-user v0.0.0-20250625014714-494533a5eba9/go.mod h1:zTOxvAVmer5UQ4b8LKj8O4unvnA57i1NvO5rpsKflrA=
+github.com/dropboks/proto-user v0.0.0-20250625031838-748bd8c8e9b5 h1:mqty4Or+1SANzVwnEibz+N9A0//CTzNKy1vtAUOAwEU=
+github.com/dropboks/proto-user v0.0.0-20250625031838-748bd8c8e9b5/go.mod h1:zTOxvAVmer5UQ4b8LKj8O4unvnA57i1NvO5rpsKflrA=
 github.com/dropboks/sharedlib v0.0.0-20250610024558-fd48e3b2004d h1:Ql/berRX5e05VvBZlLYNiMr39TpEMPshN8PnGAHig+8=
 github.com/dropboks/sharedlib v0.0.0-20250610024558-fd48e3b2004d/go.mod h1:tD3l/yU8Aj4v6vWf/d4FeJH7SfHk+54tgftz8uLTG2k=
 github.com/dropboks/sharedlib v0.0.0-20250622004919-36b558ab093c h1:zWfWGRLP8smI2qa33EQIM173aw3iOEKSA7yUAXzhvtI=
@@ -32,6 +38,8 @@ github.com/dropboks/sharedlib v0.0.0-20250624031458-dfbd09b6716a h1:du7OepETOUeD
 github.com/dropboks/sharedlib v0.0.0-20250624031458-dfbd09b6716a/go.mod h1:tD3l/yU8Aj4v6vWf/d4FeJH7SfHk+54tgftz8uLTG2k=
 github.com/dropboks/sharedlib v0.0.0-20250624031638-a37fddbd1cf5 h1:43InE+DU9953FDKU0ey3Skl0tqgyxuCbE5Jyo5Sx15E=
 github.com/dropboks/sharedlib v0.0.0-20250624031638-a37fddbd1cf5/go.mod h1:tD3l/yU8Aj4v6vWf/d4FeJH7SfHk+54tgftz8uLTG2k=
+github.com/dropboks/sharedlib v0.0.0-20250625032026-e7ade604e67e h1:EGqWQ6MF2xZk51+fE1YN+Mu8B/U8O4Js/MSUNdfqKxc=
+github.com/dropboks/sharedlib v0.0.0-20250625032026-e7ade604e67e/go.mod h1:tD3l/yU8Aj4v6vWf/d4FeJH7SfHk+54tgftz8uLTG2k=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S9k=
@@ -113,6 +121,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/redis/go-redis/v9 v9.10.0 h1:FxwK3eV8p/CQa0Ch276C7u2d0eNC9kCmAYQ7mCXCzVs=
 github.com/redis/go-redis/v9 v9.10.0/go.mod h1:huWgSWd8mW6+m0VPhJjSSQ+d6Nh1VICQ6Q5lHuCH/Iw=
+github.com/redis/go-redis/v9 v9.11.0 h1:E3S08Gl/nJNn5vkxd2i78wZxWAPNZgUNTp8WIJUAiIs=
+github.com/redis/go-redis/v9 v9.11.0/go.mod h1:huWgSWd8mW6+m0VPhJjSSQ+d6Nh1VICQ6Q5lHuCH/Iw=
 github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rs/xid v1.6.0/go.mod h1:7XoLgs4eV+QndskICGsho+ADou8ySMSjJKDIan90Nz0=
