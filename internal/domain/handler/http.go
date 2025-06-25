@@ -13,6 +13,7 @@ func AuthRoutes(r *gin.Engine, ah AuthHandler) *gin.Engine {
 		r.GET("/verify-email", ah.VerifyEmail)
 		r.POST("/resend-verification-email", ah.ResendVerficationEmail)
 		r.POST("/verify-otp", ah.VerifyOTP)
+		r.POST("/resend-verification-otp", ah.ResendVerificationOTP)
 	}
 	return r
 }

@@ -32,6 +32,7 @@ type (
 		VerifyEmailService(userId, token string) error
 		ResendVerificationService(email string) error
 		VerifyOTPService(otp, email string) (string, error)
+		ResendVerificationOTPService(email string) error
 	}
 	authService struct {
 		authRepository    repository.AuthRepository
@@ -50,7 +51,40 @@ func New(authRepository repository.AuthRepository, userServiceClient upb.UserSer
 		logger:            logger,
 		js:                js,
 	}
+}
 
+func (a *authService) ResendVerificationOTPService(email string) error {
+	ctx := context.Background()
+	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
+	if err != nil {
+		a.logger.Error().Err(err).Msg("error from user_service")
+		return err
+	}
+	otp, err := utils.GenerateOTP()
+	if err != nil {
+		a.logger.Error().Err(err).Msg("generate OTP error")
+		return dto.Err_INTERNAL_GENERATE_OTP
+	}
+	key := fmt.Sprintf("OTP:%s", user.GetId())
+	a.authRepository.SetResource(ctx, key, otp, 2*time.Minute)
+
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.Id)
+	msg := &_dto.MailNotificationMessage{
+		Receiver: []string{user.Email},
+		MsgType:  "OTP",
+		Message:  otp,
+	}
+	marshalledMsg, err := json.Marshal(msg)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("marshal data error")
+		return err
+	}
+	_, err = a.js.Publish(ctx, subject, []byte(marshalledMsg))
+	if err != nil {
+		a.logger.Error().Err(err).Msg("publish notification error")
+		return err
+	}
+	return nil
 }
 
 func (a *authService) VerifyOTPService(otp, email string) (string, error) {

@@ -22,6 +22,7 @@ type (
 		VerifyEmail(ctx *gin.Context)
 		ResendVerficationEmail(ctx *gin.Context)
 		VerifyOTP(ctx *gin.Context)
+		ResendVerificationOTP(ctx *gin.Context)
 	}
 	authHandler struct {
 		authService service.AuthService
@@ -36,6 +37,33 @@ func New(authService service.AuthService, logger zerolog.Logger) AuthHandler {
 	}
 }
 
+func (a *authHandler) ResendVerificationOTP(ctx *gin.Context) {
+	var req dto.ResendVerificationRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		res := utils.ReturnResponseError(http.StatusBadRequest, "missing email")
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+	if err := a.authService.ResendVerificationOTPService(req.Email); err != nil {
+		code := status.Code(err)
+		message := status.Convert(err).Message()
+		if code == codes.NotFound {
+			res := utils.ReturnResponseError(404, message)
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
+			return
+		} else if code == codes.Internal {
+			res := utils.ReturnResponseError(500, message)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+			return
+		}
+		res := utils.ReturnResponseError(500, err.Error())
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
+	}
+	res := utils.ReturnResponseSuccess(200, dto.OTP_SENT_SUCCESS)
+	ctx.JSON(http.StatusOK, res)
+}
+
 func (a *authHandler) VerifyOTP(ctx *gin.Context) {
 	var req dto.VerifyOTPRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -48,6 +76,10 @@ func (a *authHandler) VerifyOTP(ctx *gin.Context) {
 		if err == dto.Err_UNAUTHORIZED_OTP_INVALID {
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+			return
+		} else if err == dto.Err_NOTFOUND_KEY_NOTFOUND {
+			res := utils.ReturnResponseError(404, "otp is invalid")
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
 		}
 		code := status.Code(err)
