@@ -12,9 +12,10 @@ var (
 )
 
 var (
-	Err_BAD_REQUEST                     = errors.New("bad request in the data")
-	Err_BAD_REQUEST_WRONG_EXTENTION     = errors.New("error file extension, support jpg, jpeg, and png")
-	Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED = errors.New("max size exceeded: 6mb")
+	Err_BAD_REQUEST                       = errors.New("bad request in the data")
+	Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH = errors.New("password and confirm password doesn't match")
+	Err_BAD_REQUEST_WRONG_EXTENTION       = errors.New("error file extension, support jpg, jpeg, and png")
+	Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED   = errors.New("max size exceeded: 6mb")
 
 	Err_CONFLICT_EMAIL_EXIST           = errors.New("user with this email exist")
 	Err_CONFLICT_USER_ALREADY_VERIFIED = errors.New("user is already verified")

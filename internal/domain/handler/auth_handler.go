@@ -264,6 +264,10 @@ func (a *authHandler) Register(ctx *gin.Context) {
 			res := utils.ReturnResponseError(400, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 			return
+		} else if err == dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH {
+			res := utils.ReturnResponseError(400, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+			return
 		} else if err == dto.Err_INTENAL_JWT_SIGNING {
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)

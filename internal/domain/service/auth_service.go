@@ -228,6 +228,9 @@ func (a *authService) LogoutService(token string) error {
 }
 
 func (a *authService) RegisterService(req dto.RegisterRequest) error {
+	if req.Password != req.ConfirmPassword {
+		return dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH
+	}
 	ext := ""
 	if req.Image != nil && req.Image.Filename != "" {
 		ext = _utils.GetFileNameExtension(req.Image.Filename)
