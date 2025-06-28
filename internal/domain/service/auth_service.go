@@ -29,7 +29,7 @@ type (
 		RegisterService(req dto.RegisterRequest) error
 		VerifyService(token string) (string, error)
 		LogoutService(token string) error
-		VerifyEmailService(userId, token string) error
+		VerifyEmailService(userId, token, changeToken string) error
 		ResendVerificationService(email string) error
 		VerifyOTPService(otp, email string) (string, error)
 		ResendVerificationOTPService(email string) error
@@ -160,39 +160,78 @@ func (a *authService) ResendVerificationService(email string) error {
 	return nil
 }
 
-func (a *authService) VerifyEmailService(userId string, token string) error {
+func (a *authService) VerifyEmailService(userId, token, changeToken string) error {
 	ctx := context.Background()
-	key := fmt.Sprintf("verificationToken:%s", userId)
 	user, err := a.userServiceClient.GetUserByUserId(ctx, &upb.UserId{UserId: userId})
 	if err != nil {
 		return err
 	}
-	if user.GetVerified() {
-		return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
-	}
-	rToken, err := a.authRepository.GetResource(ctx, key)
-	if err != nil {
-		return err
-	}
-	if token != rToken {
-		return dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID
-	}
-	updatedUser := &upb.User{
-		Id:               user.GetId(),
-		FullName:         user.GetFullName(),
-		Image:            _utils.StringPtr(user.GetImage()),
-		Email:            user.GetEmail(),
-		Password:         user.GetPassword(),
-		Verified:         true,
-		TwoFactorEnabled: false,
-	}
-	_, err = a.userServiceClient.UpdateUser(ctx, updatedUser)
-	if err != nil {
-		return err
-	}
-	err = a.authRepository.RemoveResource(ctx, key)
-	if err != nil {
-		return err
+	var key string
+	var updatedUser *upb.User
+	if changeToken != "" {
+		key = fmt.Sprintf("changeEmailToken:%s", userId)
+		rToken, err := a.authRepository.GetResource(ctx, key)
+		if err != nil {
+			return err
+		}
+		if changeToken != rToken {
+			return dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID
+		}
+		newEmailkey := fmt.Sprintf("newEmail:%s", userId)
+		newEmail, err := a.authRepository.GetResource(ctx, newEmailkey)
+		if err != nil {
+			return err
+		}
+		updatedUser = &upb.User{
+			Id:               user.GetId(),
+			FullName:         user.GetFullName(),
+			Image:            _utils.StringPtr(user.GetImage()),
+			Email:            newEmail,
+			Password:         user.GetPassword(),
+			Verified:         user.GetVerified(),
+			TwoFactorEnabled: user.GetTwoFactorEnabled(),
+		}
+		_, err = a.userServiceClient.UpdateUser(ctx, updatedUser)
+		if err != nil {
+			return err
+		}
+		err = a.authRepository.RemoveResource(ctx, key)
+		if err != nil {
+			return err
+		}
+		err = a.authRepository.RemoveResource(ctx, newEmailkey)
+		if err != nil {
+			return err
+		}
+	} else {
+		if user.GetVerified() {
+			return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
+		}
+		key = fmt.Sprintf("verificationToken:%s", userId)
+		rToken, err := a.authRepository.GetResource(ctx, key)
+		if err != nil {
+			return err
+		}
+		if token != rToken {
+			return dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID
+		}
+		updatedUser = &upb.User{
+			Id:               user.GetId(),
+			FullName:         user.GetFullName(),
+			Image:            _utils.StringPtr(user.GetImage()),
+			Email:            user.GetEmail(),
+			Password:         user.GetPassword(),
+			Verified:         true,
+			TwoFactorEnabled: false,
+		}
+		_, err = a.userServiceClient.UpdateUser(ctx, updatedUser)
+		if err != nil {
+			return err
+		}
+		err = a.authRepository.RemoveResource(ctx, key)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

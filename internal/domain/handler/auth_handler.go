@@ -141,12 +141,13 @@ func (a *authHandler) ResendVerficationEmail(ctx *gin.Context) {
 func (a *authHandler) VerifyEmail(ctx *gin.Context) {
 	userId := ctx.Query("userid")
 	token := ctx.Query("token")
-	if userId == "" || token == "" {
+	changeEmailToken := ctx.Query("changeToken")
+	if userId == "" || (token == "" || changeEmailToken == "") {
 		res := utils.ReturnResponseError(http.StatusBadRequest, "userid and token are required")
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}
-	if err := a.authService.VerifyEmailService(userId, token); err != nil {
+	if err := a.authService.VerifyEmailService(userId, token, changeEmailToken); err != nil {
 		if err == dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID {
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
