@@ -12,7 +12,7 @@ var (
 )
 
 var (
-	Err_BAD_REQUEST                       = errors.New("bad request in the data")
+	Err_BAD_REQUEST                       = errors.New("invalid input")
 	Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH = errors.New("password and confirm password doesn't match")
 	Err_BAD_REQUEST_WRONG_EXTENTION       = errors.New("error file extension, support jpg, jpeg, and png")
 	Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED   = errors.New("max size exceeded: 6mb")
@@ -20,7 +20,7 @@ var (
 	Err_CONFLICT_EMAIL_EXIST           = errors.New("user with this email exist")
 	Err_CONFLICT_USER_ALREADY_VERIFIED = errors.New("user is already verified")
 
-	Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH      = errors.New("password doesn't match")
+	Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH      = errors.New("email or password is wrong")
 	Err_UNAUTHORIZED_JWT_INVALID                = errors.New("token is invalid")
 	Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID = errors.New("token is invalid")
 	Err_UNAUTHORIZED_USER_NOT_VERIFIED          = errors.New("user is not verified")
