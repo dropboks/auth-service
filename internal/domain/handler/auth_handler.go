@@ -142,8 +142,8 @@ func (a *authHandler) VerifyEmail(ctx *gin.Context) {
 	userId := ctx.Query("userid")
 	token := ctx.Query("token")
 	changeEmailToken := ctx.Query("changeToken")
-	if userId == "" || (token == "" || changeEmailToken == "") {
-		res := utils.ReturnResponseError(http.StatusBadRequest, "userid and token are required")
+	if userId == "" || (token == "" && changeEmailToken == "") {
+		res := utils.ReturnResponseError(http.StatusBadRequest, "invalid input")
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}
