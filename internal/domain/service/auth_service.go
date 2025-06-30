@@ -134,7 +134,7 @@ func (a *authService) ResendVerificationService(email string) error {
 	if user.GetVerified() {
 		return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
 	}
-	verificationToken, err := utils.RandomString64()
+	verificationToken, err := _utils.RandomString64()
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error generate verification token")
 		return dto.Err_INTERNAL_GENERATE_TOKEN
@@ -335,7 +335,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 		_, err := a.fileServiceClient.RemoveProfileImage(ctx, &fpb.ImageName{Name: *imageName})
 		return err
 	}
-	verificationToken, err := utils.RandomString64()
+	verificationToken, err := _utils.RandomString64()
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error generate verification token")
 		return dto.Err_INTERNAL_GENERATE_TOKEN
