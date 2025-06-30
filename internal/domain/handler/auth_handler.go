@@ -293,8 +293,8 @@ func (a *authHandler) Register(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 		return
 	}
-	res := utils.ReturnResponseSuccess(200, dto.REGISTER_SUCCESS)
-	ctx.JSON(http.StatusOK, res)
+	res := utils.ReturnResponseSuccess(201, dto.REGISTER_SUCCESS)
+	ctx.JSON(http.StatusCreated, res)
 }
 
 func (a *authHandler) Verify(ctx *gin.Context) {
