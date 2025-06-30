@@ -5,7 +5,7 @@ go 1.24.2
 require (
 	github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf
 	github.com/dropboks/proto-user v0.0.0-20250625031838-748bd8c8e9b5
-	github.com/dropboks/sharedlib v0.0.0-20250630043536-7dcea1b26d60
+	github.com/dropboks/sharedlib v0.0.0-20250630083049-8e0644a513aa
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
@@ -15,7 +15,6 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.20.1
 	go.uber.org/dig v1.19.0
-	golang.org/x/crypto v0.39.0
 	google.golang.org/grpc v1.73.0
 )
 
@@ -54,6 +53,7 @@ require (
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.18.0 // indirect
+	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect

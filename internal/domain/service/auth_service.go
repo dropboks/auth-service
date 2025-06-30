@@ -296,7 +296,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 		a.logger.Error().Str("email", req.Email).Msg("User with this email exist")
 		return dto.Err_CONFLICT_EMAIL_EXIST
 	}
-	password, err := utils.HashPassword(req.Password)
+	password, err := _utils.HashPassword(req.Password)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error hashing password")
 	}
@@ -381,7 +381,7 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		return "", dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
 	}
 
-	ok := utils.HashPasswordCompare(req.Password, user.Password)
+	ok := _utils.HashPasswordCompare(req.Password, user.Password)
 	if !ok {
 		a.logger.Error().Err(err).Msg("Password doesn't match")
 		return "", dto.Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH

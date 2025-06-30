@@ -22,10 +22,8 @@ github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf h1:w1OJZ9TkC62
 github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf/go.mod h1:stfWzJh9Wmm3h5WqjQxMlEJFeUzWOlld4sc8HZrvYd4=
 github.com/dropboks/proto-user v0.0.0-20250625031838-748bd8c8e9b5 h1:mqty4Or+1SANzVwnEibz+N9A0//CTzNKy1vtAUOAwEU=
 github.com/dropboks/proto-user v0.0.0-20250625031838-748bd8c8e9b5/go.mod h1:zTOxvAVmer5UQ4b8LKj8O4unvnA57i1NvO5rpsKflrA=
-github.com/dropboks/sharedlib v0.0.0-20250625032026-e7ade604e67e h1:EGqWQ6MF2xZk51+fE1YN+Mu8B/U8O4Js/MSUNdfqKxc=
-github.com/dropboks/sharedlib v0.0.0-20250625032026-e7ade604e67e/go.mod h1:tD3l/yU8Aj4v6vWf/d4FeJH7SfHk+54tgftz8uLTG2k=
-github.com/dropboks/sharedlib v0.0.0-20250630043536-7dcea1b26d60 h1:xyvN4klbkzSwy1+nKGJYm7sbzq7Sb0VIoAAHL5yuuJc=
-github.com/dropboks/sharedlib v0.0.0-20250630043536-7dcea1b26d60/go.mod h1:tD3l/yU8Aj4v6vWf/d4FeJH7SfHk+54tgftz8uLTG2k=
+github.com/dropboks/sharedlib v0.0.0-20250630083049-8e0644a513aa h1:7jXC1f8iF5vu8/Yvvc22fqWwNKaQIYrM8gt/KKEBGmI=
+github.com/dropboks/sharedlib v0.0.0-20250630083049-8e0644a513aa/go.mod h1:6C4Aj5U5aYLtcS0M9fS4NWpM06UXI2lvy2mB5TD9cTo=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S9k=
