@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	dto "github.com/dropboks/auth-service/internal/domain/dto"
@@ -324,7 +325,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 	userId := uuid.New().String()
 	user := &upb.User{
 		Id:       userId,
-		FullName: req.FullName,
+		FullName: strings.TrimSpace(req.FullName),
 		Image:    imageName,
 		Email:    req.Email,
 		Password: password,
