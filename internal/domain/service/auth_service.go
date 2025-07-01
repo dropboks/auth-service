@@ -11,13 +11,13 @@ import (
 	"github.com/dropboks/auth-service/internal/domain/repository"
 	_mq "github.com/dropboks/auth-service/internal/infrastructure/message-queue"
 	"github.com/dropboks/auth-service/pkg/constant"
+	"github.com/dropboks/auth-service/pkg/generators"
 	"github.com/dropboks/auth-service/pkg/jwt"
 	utils "github.com/dropboks/auth-service/pkg/utils"
 	fpb "github.com/dropboks/proto-file/pkg/fpb"
 	upb "github.com/dropboks/proto-user/pkg/upb"
 	_dto "github.com/dropboks/sharedlib/dto"
 	_utils "github.com/dropboks/sharedlib/utils"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
@@ -43,16 +43,18 @@ type (
 		fileServiceClient fpb.FileServiceClient
 		logger            zerolog.Logger
 		js                _mq.JetStreamInfra
+		g                 generators.RandomGenerator
 	}
 )
 
-func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger, js _mq.JetStreamInfra) AuthService {
+func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger, js _mq.JetStreamInfra, g generators.RandomGenerator) AuthService {
 	return &authService{
 		authRepository:    authRepository,
 		userServiceClient: userServiceClient,
 		fileServiceClient: fileServiceClient,
 		logger:            logger,
 		js:                js,
+		g:                 g,
 	}
 }
 
@@ -104,7 +106,7 @@ func (a *authService) ResetPasswordService(email string) error {
 		return err
 	}
 
-	resetPasswordToken, err := _utils.RandomString64()
+	resetPasswordToken, err := a.g.GenerateToken()
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error generate verification token")
 		return dto.Err_INTERNAL_GENERATE_TOKEN
@@ -217,7 +219,7 @@ func (a *authService) ResendVerificationService(email string) error {
 	if user.GetVerified() {
 		return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
 	}
-	verificationToken, err := _utils.RandomString64()
+	verificationToken, err := a.g.GenerateToken()
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error generate verification token")
 		return dto.Err_INTERNAL_GENERATE_TOKEN
@@ -409,7 +411,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 		imageName = nil
 	}
 
-	userId := uuid.New().String()
+	userId := a.g.GenerateUUID()
 	user := &upb.User{
 		Id:       userId,
 		FullName: strings.TrimSpace(req.FullName),
@@ -422,7 +424,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 		_, err := a.fileServiceClient.RemoveProfileImage(ctx, &fpb.ImageName{Name: *imageName})
 		return err
 	}
-	verificationToken, err := _utils.RandomString64()
+	verificationToken, err := a.g.GenerateToken()
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error generate verification token")
 		return dto.Err_INTERNAL_GENERATE_TOKEN

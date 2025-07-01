@@ -11,6 +11,7 @@ import (
 	cache "github.com/dropboks/auth-service/internal/infrastructure/cache"
 	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
 	_mq "github.com/dropboks/auth-service/internal/infrastructure/message-queue"
+	"github.com/dropboks/auth-service/pkg/generators"
 	"go.uber.org/dig"
 )
 
@@ -23,6 +24,9 @@ func BuildContainer() *dig.Container {
 	// nats client connection
 	if err := container.Provide(mq.New); err != nil {
 		panic("Failed to provide nats connection: " + err.Error())
+	}
+	if err := container.Provide(generators.NewRandomStringGenerator); err != nil {
+		panic("Failed to provide random string generator: " + err.Error())
 	}
 	// jetstream connection
 	if err := container.Provide(mq.NewJetstream); err != nil {
