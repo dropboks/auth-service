@@ -10,6 +10,7 @@ import (
 	"github.com/dropboks/auth-service/internal/domain/service"
 	cache "github.com/dropboks/auth-service/internal/infrastructure/cache"
 	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
+	_mq "github.com/dropboks/auth-service/internal/infrastructure/message-queue"
 	"go.uber.org/dig"
 )
 
@@ -26,6 +27,10 @@ func BuildContainer() *dig.Container {
 	// jetstream connection
 	if err := container.Provide(mq.NewJetstream); err != nil {
 		panic("Failed to provide jetstream connection: " + err.Error())
+	}
+	// jetstream infrastructure
+	if err := container.Provide(_mq.NewJetstreamInfra); err != nil {
+		panic("Failed to provide jetstream infrastructure: " + err.Error())
 	}
 	// redis client connection
 	if err := container.Provide(_cache.New); err != nil {

@@ -9,6 +9,7 @@ import (
 
 	dto "github.com/dropboks/auth-service/internal/domain/dto"
 	"github.com/dropboks/auth-service/internal/domain/repository"
+	_mq "github.com/dropboks/auth-service/internal/infrastructure/message-queue"
 	"github.com/dropboks/auth-service/pkg/constant"
 	"github.com/dropboks/auth-service/pkg/jwt"
 	utils "github.com/dropboks/auth-service/pkg/utils"
@@ -17,7 +18,6 @@ import (
 	_dto "github.com/dropboks/sharedlib/dto"
 	_utils "github.com/dropboks/sharedlib/utils"
 	"github.com/google/uuid"
-	"github.com/nats-io/nats.go/jetstream"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
@@ -42,11 +42,11 @@ type (
 		userServiceClient upb.UserServiceClient
 		fileServiceClient fpb.FileServiceClient
 		logger            zerolog.Logger
-		js                jetstream.JetStream
+		js                _mq.JetStreamInfra
 	}
 )
 
-func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger, js jetstream.JetStream) AuthService {
+func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger, js _mq.JetStreamInfra) AuthService {
 	return &authService{
 		authRepository:    authRepository,
 		userServiceClient: userServiceClient,
