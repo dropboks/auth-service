@@ -14,6 +14,8 @@ func AuthRoutes(r *gin.Engine, ah AuthHandler) *gin.Engine {
 		r.POST("/resend-verification-email", ah.ResendVerficationEmail)
 		r.POST("/verify-otp", ah.VerifyOTP)
 		r.POST("/resend-verification-otp", ah.ResendVerificationOTP)
+		r.POST("/reset-password", ah.ResetPassword)
+		r.PATCH("/change-password", ah.ChangePassword)
 	}
 	return r
 }

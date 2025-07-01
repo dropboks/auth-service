@@ -3,12 +3,14 @@ package dto
 import "errors"
 
 var (
-	LOGIN_SUCCESS               = "Login Success"
-	VERIFICATION_SUCCESS        = "Verification Success"
-	REGISTER_SUCCESS            = "Register Success. Check your email for verification."
-	RESEND_VERIFICATION_SUCCESS = "Check your email for verification"
-	OTP_VERIFICATION_SUCCESS    = "OTP is Valid"
-	OTP_SENT_SUCCESS            = "OTP Has been sent to linked email"
+	LOGIN_SUCCESS                = "Login Success"
+	VERIFICATION_SUCCESS         = "Verification Success"
+	REGISTER_SUCCESS             = "Register Success. Check your email for verification."
+	RESEND_VERIFICATION_SUCCESS  = "Check your email for verification"
+	OTP_VERIFICATION_SUCCESS     = "OTP is Valid"
+	OTP_SENT_SUCCESS             = "OTP Has been sent to linked email"
+	RESET_PASSWORD_EMAIL_SUCCESS = "Reset password email has been sent"
+	CHANGE_PASSWORD_SUCCESS      = "password changed"
 )
 
 var (
@@ -20,11 +22,11 @@ var (
 	Err_CONFLICT_EMAIL_EXIST           = errors.New("user with this email exist")
 	Err_CONFLICT_USER_ALREADY_VERIFIED = errors.New("user is already verified")
 
-	Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH      = errors.New("email or password is wrong")
-	Err_UNAUTHORIZED_JWT_INVALID                = errors.New("token is invalid")
-	Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID = errors.New("token is invalid")
-	Err_UNAUTHORIZED_USER_NOT_VERIFIED          = errors.New("user is not verified")
-	Err_UNAUTHORIZED_OTP_INVALID                = errors.New("OTP is invalid")
+	Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH = errors.New("email or password is wrong")
+	Err_UNAUTHORIZED_JWT_INVALID           = errors.New("token is invalid")
+	Err_UNAUTHORIZED_TOKEN_INVALID         = errors.New("token is invalid")
+	Err_UNAUTHORIZED_USER_NOT_VERIFIED     = errors.New("user is not verified")
+	Err_UNAUTHORIZED_OTP_INVALID           = errors.New("OTP is invalid")
 
 	Err_NOTFOUND_KEY_NOTFOUND = errors.New("resource is not found")
 

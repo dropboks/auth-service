@@ -23,6 +23,8 @@ type (
 		ResendVerficationEmail(ctx *gin.Context)
 		VerifyOTP(ctx *gin.Context)
 		ResendVerificationOTP(ctx *gin.Context)
+		ResetPassword(ctx *gin.Context)
+		ChangePassword(ctx *gin.Context)
 	}
 	authHandler struct {
 		authService service.AuthService
@@ -35,6 +37,73 @@ func New(authService service.AuthService, logger zerolog.Logger) AuthHandler {
 		authService: authService,
 		logger:      logger,
 	}
+}
+
+func (a *authHandler) ChangePassword(ctx *gin.Context) {
+	userId := ctx.Query("userid")
+	resetPasswordtoken := ctx.Query("resetPasswordToken")
+	if userId == "" || resetPasswordtoken == "" {
+		a.logger.Error().Msg("missing userId or token")
+		res := utils.ReturnResponseError(http.StatusBadRequest, "invalid input")
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+	var req dto.ChangePasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		a.logger.Error().Err(err).Msg("missing body request")
+		res := utils.ReturnResponseError(400, "invalid input")
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+	if err := a.authService.ChangePasswordService(userId, resetPasswordtoken, &req); err != nil {
+		if err == dto.Err_UNAUTHORIZED_TOKEN_INVALID {
+			res := utils.ReturnResponseError(401, "invalid token")
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+			return
+		} else if err == dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH {
+			res := utils.ReturnResponseError(400, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+			return
+		}
+		code := status.Code(err)
+		message := status.Convert(err).Message()
+		if code == codes.NotFound {
+			res := utils.ReturnResponseError(404, message)
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
+			return
+		}
+		res := utils.ReturnResponseError(500, err.Error())
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
+	}
+	res := utils.ReturnResponseSuccess(200, dto.CHANGE_PASSWORD_SUCCESS)
+	ctx.JSON(http.StatusOK, res)
+}
+
+func (a *authHandler) ResetPassword(ctx *gin.Context) {
+	var req dto.ResetPasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		a.logger.Error().Err(err).Msg("bad request")
+		res := utils.ReturnResponseError(http.StatusBadRequest, "missing email")
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
+		return
+	}
+	if err := a.authService.ResetPasswordService(req.Email); err != nil {
+		a.logger.Error().Err(err).Msg("failed to reset")
+		code := status.Code(err)
+		message := status.Convert(err).Message()
+		if code == codes.NotFound {
+			res := utils.ReturnResponseError(404, message)
+			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
+			return
+		}
+		res := utils.ReturnResponseError(500, err.Error())
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
+		return
+	}
+
+	res := utils.ReturnResponseSuccess(200, dto.RESET_PASSWORD_EMAIL_SUCCESS)
+	ctx.JSON(http.StatusOK, res)
 }
 
 func (a *authHandler) ResendVerificationOTP(ctx *gin.Context) {
@@ -148,7 +217,7 @@ func (a *authHandler) VerifyEmail(ctx *gin.Context) {
 		return
 	}
 	if err := a.authService.VerifyEmailService(userId, token, changeEmailToken); err != nil {
-		if err == dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID {
+		if err == dto.Err_UNAUTHORIZED_TOKEN_INVALID {
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return

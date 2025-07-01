@@ -34,6 +34,8 @@ type (
 		ResendVerificationService(email string) error
 		VerifyOTPService(otp, email string) (string, error)
 		ResendVerificationOTPService(email string) error
+		ResetPasswordService(email string) error
+		ChangePasswordService(userId, resetPasswordToken string, req *dto.ChangePasswordRequest) error
 	}
 	authService struct {
 		authRepository    repository.AuthRepository
@@ -54,6 +56,85 @@ func New(authRepository repository.AuthRepository, userServiceClient upb.UserSer
 	}
 }
 
+func (a *authService) ChangePasswordService(userId string, resetPasswordToken string, req *dto.ChangePasswordRequest) error {
+	ctx := context.Background()
+	key := fmt.Sprintf("resetPasswordToken:%s", userId)
+	rToken, err := a.authRepository.GetResource(ctx, key)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("get token error")
+		return err
+	}
+	if rToken != resetPasswordToken {
+		a.logger.Error().Msg("token is not match")
+		return dto.Err_UNAUTHORIZED_TOKEN_INVALID
+	}
+	if req.Password != req.ConfirmPassword {
+		a.logger.Error().Msg("password and confirm password doesn't match")
+		return dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH
+	}
+	user, err := a.userServiceClient.GetUserByUserId(ctx, &upb.UserId{UserId: userId})
+	if err != nil {
+		return err
+	}
+	hashedPassword, err := _utils.HashPassword(req.Password)
+	if err != nil {
+		return err
+	}
+
+	us := &upb.User{
+		Id:               userId,
+		FullName:         user.GetFullName(),
+		Image:            _utils.StringPtr(user.GetImage()),
+		Email:            user.Email,
+		Password:         hashedPassword,
+		Verified:         user.GetVerified(),
+		TwoFactorEnabled: user.TwoFactorEnabled,
+	}
+	_, err = a.userServiceClient.UpdateUser(ctx, us)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *authService) ResetPasswordService(email string) error {
+	ctx := context.Background()
+	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
+	if err != nil {
+		return err
+	}
+
+	resetPasswordToken, err := _utils.RandomString64()
+	if err != nil {
+		a.logger.Error().Err(err).Msg("error generate verification token")
+		return dto.Err_INTERNAL_GENERATE_TOKEN
+	}
+
+	key := fmt.Sprintf("resetPasswordToken:%s", user.GetId())
+	if err := a.authRepository.SetResource(ctx, key, resetPasswordToken, 1*time.Hour); err != nil {
+		a.logger.Error().Err(err).Msg("failed to set reset password token")
+		return err
+	}
+
+	link := fmt.Sprintf("%s/%suserid=%s&resetPasswordToken=%s", viper.GetString("app.url"), "auth/change-password?", user.GetId(), resetPasswordToken)
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.GetId())
+	msg := &_dto.MailNotificationMessage{
+		Receiver: []string{user.Email},
+		MsgType:  "resetPassword",
+		Message:  link,
+	}
+	marshalledMsg, err := json.Marshal(msg)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("marshal data error")
+		return err
+	}
+	_, err = a.js.Publish(ctx, subject, []byte(marshalledMsg))
+	if err != nil {
+		a.logger.Error().Err(err).Msg("publish notification error")
+	}
+	return nil
+}
+
 func (a *authService) ResendVerificationOTPService(email string) error {
 	ctx := context.Background()
 	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
@@ -67,7 +148,10 @@ func (a *authService) ResendVerificationOTPService(email string) error {
 		return dto.Err_INTERNAL_GENERATE_OTP
 	}
 	key := fmt.Sprintf("OTP:%s", user.GetId())
-	a.authRepository.SetResource(ctx, key, otp, 2*time.Minute)
+	if err := a.authRepository.SetResource(ctx, key, otp, 2*time.Minute); err != nil {
+		a.logger.Error().Err(err).Msg("failed to set OTP")
+		return err
+	}
 
 	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.Id)
 	msg := &_dto.MailNotificationMessage{
@@ -117,8 +201,7 @@ func (a *authService) VerifyOTPService(otp, email string) (string, error) {
 		return "", dto.Err_INTENAL_JWT_SIGNING
 	}
 	sessionKey := "session:" + user.GetId()
-	err = a.authRepository.SetResource(ctx, sessionKey, token, 1*time.Hour)
-	if err != nil {
+	if err := a.authRepository.SetResource(ctx, sessionKey, token, 1*time.Hour); err != nil {
 		a.logger.Error().Err(err).Msg("error saving token to Redis")
 		return "", err
 	}
@@ -140,7 +223,10 @@ func (a *authService) ResendVerificationService(email string) error {
 		return dto.Err_INTERNAL_GENERATE_TOKEN
 	}
 	key := fmt.Sprintf("verificationToken:%s", user.GetId())
-	a.authRepository.SetResource(ctx, key, verificationToken, 30*time.Minute)
+	if err := a.authRepository.SetResource(ctx, key, verificationToken, 30*time.Minute); err != nil {
+		a.logger.Error().Err(err).Msg("failed to set verification token")
+		return err
+	}
 	link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), "auth/verify-email?", user.GetId(), verificationToken)
 	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.GetId())
 	msg := &_dto.MailNotificationMessage{
@@ -176,7 +262,7 @@ func (a *authService) VerifyEmailService(userId, token, changeToken string) erro
 			return err
 		}
 		if changeToken != rToken {
-			return dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID
+			return dto.Err_UNAUTHORIZED_TOKEN_INVALID
 		}
 		newEmailkey := fmt.Sprintf("newEmail:%s", userId)
 		newEmail, err := a.authRepository.GetResource(ctx, newEmailkey)
@@ -214,8 +300,9 @@ func (a *authService) VerifyEmailService(userId, token, changeToken string) erro
 			return err
 		}
 		if token != rToken {
-			return dto.Err_UNAUTHORIZED_VERIFICATION_TOKEN_INVALID
+			return dto.Err_UNAUTHORIZED_TOKEN_INVALID
 		}
+
 		updatedUser = &upb.User{
 			Id:               user.GetId(),
 			FullName:         user.GetFullName(),
@@ -342,7 +429,10 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 	}
 
 	key := fmt.Sprintf("verificationToken:%s", userId)
-	a.authRepository.SetResource(ctx, key, verificationToken, 30*time.Minute)
+	if err := a.authRepository.SetResource(ctx, key, verificationToken, 30*time.Minute); err != nil {
+		a.logger.Error().Err(err).Msg("failed to set verification token")
+		return err
+	}
 
 	go func() {
 
@@ -394,7 +484,10 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 			return "", dto.Err_INTERNAL_GENERATE_OTP
 		}
 		key := fmt.Sprintf("OTP:%s", user.Id)
-		a.authRepository.SetResource(c, key, otp, 2*time.Minute)
+		if err := a.authRepository.SetResource(c, key, otp, 2*time.Minute); err != nil {
+			a.logger.Error().Err(err).Msg("failed to set OTP")
+			return "", err
+		}
 
 		go func() {
 			subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.Id)
@@ -422,8 +515,7 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		return "", dto.Err_INTENAL_JWT_SIGNING
 	}
 	sessionKey := "session:" + user.GetId()
-	err = a.authRepository.SetResource(c, sessionKey, token, 1*time.Hour)
-	if err != nil {
+	if err := a.authRepository.SetResource(c, sessionKey, token, 1*time.Hour); err != nil {
 		a.logger.Error().Err(err).Msg("Error saving token to Redis")
 		return "", err
 	}
