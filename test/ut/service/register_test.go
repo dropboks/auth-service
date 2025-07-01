@@ -30,7 +30,7 @@ type RegisterServiceSuite struct {
 	mockGenerator  *mocks.MockRandomGenerator
 }
 
-func (l *RegisterServiceSuite) SetupSuite() {
+func (r *RegisterServiceSuite) SetupSuite() {
 
 	mockAuthRepo := new(mocks.MockAuthRepository)
 	mockUserClient := new(mocks.MockUserServiceClient)
@@ -40,31 +40,31 @@ func (l *RegisterServiceSuite) SetupSuite() {
 
 	logger := zerolog.Nop()
 	// logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
-	l.mockAuthRepo = mockAuthRepo
-	l.mockUserClient = mockUserClient
-	l.mockFileClient = mockFileClient
-	l.mockJetStream = mockJetStream
-	l.mockGenerator = mockGenerator
-	l.authService = service.New(mockAuthRepo, mockUserClient, mockFileClient, logger, mockJetStream, mockGenerator)
+	r.mockAuthRepo = mockAuthRepo
+	r.mockUserClient = mockUserClient
+	r.mockFileClient = mockFileClient
+	r.mockJetStream = mockJetStream
+	r.mockGenerator = mockGenerator
+	r.authService = service.New(mockAuthRepo, mockUserClient, mockFileClient, logger, mockJetStream, mockGenerator)
 }
 
-func (l *RegisterServiceSuite) SetupTest() {
-	l.mockAuthRepo.ExpectedCalls = nil
-	l.mockUserClient.ExpectedCalls = nil
-	l.mockFileClient.ExpectedCalls = nil
-	l.mockJetStream.ExpectedCalls = nil
-	l.mockGenerator.ExpectedCalls = nil
-	l.mockAuthRepo.Calls = nil
-	l.mockUserClient.Calls = nil
-	l.mockFileClient.Calls = nil
-	l.mockJetStream.Calls = nil
-	l.mockGenerator.Calls = nil
+func (r *RegisterServiceSuite) SetupTest() {
+	r.mockAuthRepo.ExpectedCalls = nil
+	r.mockUserClient.ExpectedCalls = nil
+	r.mockFileClient.ExpectedCalls = nil
+	r.mockJetStream.ExpectedCalls = nil
+	r.mockGenerator.ExpectedCalls = nil
+	r.mockAuthRepo.Calls = nil
+	r.mockUserClient.Calls = nil
+	r.mockFileClient.Calls = nil
+	r.mockJetStream.Calls = nil
+	r.mockGenerator.Calls = nil
 }
 
 func TestRegisterServiceSuite(t *testing.T) {
 	suite.Run(t, &RegisterServiceSuite{})
 }
-func (l *RegisterServiceSuite) TestAuthService_RegisterService_Success() {
+func (r *RegisterServiceSuite) TestAuthService_RegisterService_Success() {
 	imageData := bytes.Repeat([]byte("test"), 1024)
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
@@ -89,29 +89,29 @@ func (l *RegisterServiceSuite) TestAuthService_RegisterService_Success() {
 		Sequence: 1,
 	}
 
-	l.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
+	r.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
 		return email.Email == registerReq.Email
 	})).Return(nil, status.Error(codes.NotFound, "user not found"))
 
-	l.mockFileClient.On("SaveProfileImage", mock.Anything, mock.Anything).Return(&fpb.ImageName{Name: "saved-image-name.jpg"}, nil)
-	l.mockGenerator.On("GenerateUUID").Return("uuid-generated")
-	l.mockUserClient.On("CreateUser", mock.Anything, mock.Anything).Return(&upb.Status{Success: true}, nil)
-	l.mockGenerator.On("GenerateToken", mock.Anything).Return("token-generated", nil)
-	l.mockAuthRepo.On("SetResource", mock.Anything, "verificationToken:uuid-generated", mock.AnythingOfType("string"), mock.Anything).Return(nil)
-	l.mockJetStream.On("Publish", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("[]uint8")).Return(mockPubAck, nil)
+	r.mockFileClient.On("SaveProfileImage", mock.Anything, mock.Anything).Return(&fpb.ImageName{Name: "saved-image-name.jpg"}, nil)
+	r.mockGenerator.On("GenerateUUID").Return("uuid-generated")
+	r.mockUserClient.On("CreateUser", mock.Anything, mock.Anything).Return(&upb.Status{Success: true}, nil)
+	r.mockGenerator.On("GenerateToken", mock.Anything).Return("token-generated", nil)
+	r.mockAuthRepo.On("SetResource", mock.Anything, "verificationToken:uuid-generated", mock.AnythingOfType("string"), mock.Anything).Return(nil)
+	r.mockJetStream.On("Publish", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("[]uint8")).Return(mockPubAck, nil)
 
-	err := l.authService.RegisterService(registerReq)
+	err := r.authService.RegisterService(registerReq)
 
-	assert.NoError(l.T(), err)
-	l.mockUserClient.AssertExpectations(l.T())
-	l.mockFileClient.AssertExpectations(l.T())
-	l.mockAuthRepo.AssertExpectations(l.T())
-	l.mockGenerator.AssertExpectations(l.T())
+	assert.NoError(r.T(), err)
+	r.mockUserClient.AssertExpectations(r.T())
+	r.mockFileClient.AssertExpectations(r.T())
+	r.mockAuthRepo.AssertExpectations(r.T())
+	r.mockGenerator.AssertExpectations(r.T())
 
 	time.Sleep(100 * time.Millisecond)
-	l.mockJetStream.AssertExpectations(l.T())
+	r.mockJetStream.AssertExpectations(r.T())
 }
-func (l *RegisterServiceSuite) TestAuthService_RegisterService_PasswordNotMatch() {
+func (r *RegisterServiceSuite) TestAuthService_RegisterService_PasswordNotMatch() {
 
 	registerReq := dto.RegisterRequest{
 		FullName:        "test_fullname",
@@ -121,11 +121,11 @@ func (l *RegisterServiceSuite) TestAuthService_RegisterService_PasswordNotMatch(
 		ConfirmPassword: "password123",
 	}
 
-	err := l.authService.RegisterService(registerReq)
+	err := r.authService.RegisterService(registerReq)
 
-	assert.Error(l.T(), err)
+	assert.Error(r.T(), err)
 }
-func (l *RegisterServiceSuite) TestAuthService_RegisterService_WrongImageExtension() {
+func (r *RegisterServiceSuite) TestAuthService_RegisterService_WrongImageExtension() {
 	imageData := bytes.Repeat([]byte("test"), 1024)
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
@@ -145,11 +145,11 @@ func (l *RegisterServiceSuite) TestAuthService_RegisterService_WrongImageExtensi
 		ConfirmPassword: "password123",
 	}
 
-	err := l.authService.RegisterService(registerReq)
+	err := r.authService.RegisterService(registerReq)
 
-	assert.Error(l.T(), err)
+	assert.Error(r.T(), err)
 }
-func (l *RegisterServiceSuite) TestAuthService_RegisterService_ImageSizeExceeded() {
+func (r *RegisterServiceSuite) TestAuthService_RegisterService_ImageSizeExceeded() {
 	imageData := bytes.Repeat([]byte("test"), 8*1024*1024)
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
@@ -169,10 +169,10 @@ func (l *RegisterServiceSuite) TestAuthService_RegisterService_ImageSizeExceeded
 		ConfirmPassword: "password123",
 	}
 
-	err := l.authService.RegisterService(registerReq)
-	assert.Error(l.T(), err)
+	err := r.authService.RegisterService(registerReq)
+	assert.Error(r.T(), err)
 }
-func (l *RegisterServiceSuite) TestAuthService_RegisterService_EmailAlreadyExist() {
+func (r *RegisterServiceSuite) TestAuthService_RegisterService_EmailAlreadyExist() {
 
 	registerReq := dto.RegisterRequest{
 		FullName:        "test_fullname",
@@ -189,12 +189,12 @@ func (l *RegisterServiceSuite) TestAuthService_RegisterService_EmailAlreadyExist
 		Verified:         true,
 		TwoFactorEnabled: false,
 	}
-	l.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
+	r.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
 		return email.Email == registerReq.Email
 	})).Return(mockUser, nil)
 
-	err := l.authService.RegisterService(registerReq)
-	assert.Error(l.T(), err)
+	err := r.authService.RegisterService(registerReq)
+	assert.Error(r.T(), err)
 
-	l.mockUserClient.AssertExpectations(l.T())
+	r.mockUserClient.AssertExpectations(r.T())
 }
