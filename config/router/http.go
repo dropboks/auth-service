@@ -1,6 +1,7 @@
 package router
 
 import (
+	"os"
 	"strings"
 	"time"
 
@@ -12,7 +13,10 @@ import (
 )
 
 func New(zerolog zerolog.Logger) *gin.Engine {
-	gin.SetMode(gin.ReleaseMode)
+	env := os.Getenv("ENV")
+	if env == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := gin.New()
 	r.Use(middleware.AccessLogger(zerolog))
 
