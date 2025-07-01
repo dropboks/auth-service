@@ -85,10 +85,10 @@ func (a *authService) ChangePasswordService(userId string, resetPasswordToken st
 		Id:               userId,
 		FullName:         user.GetFullName(),
 		Image:            _utils.StringPtr(user.GetImage()),
-		Email:            user.Email,
+		Email:            user.GetEmail(),
 		Password:         hashedPassword,
 		Verified:         user.GetVerified(),
-		TwoFactorEnabled: user.TwoFactorEnabled,
+		TwoFactorEnabled: user.GetTwoFactorEnabled(),
 	}
 	_, err = a.userServiceClient.UpdateUser(ctx, us)
 	if err != nil {
@@ -466,18 +466,18 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		return "", err
 	}
 
-	if !user.Verified {
+	if !user.GetVerified() {
 		a.logger.Error().Msgf("user not verified :%s", user.GetEmail())
 		return "", dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
 	}
 
-	ok := _utils.HashPasswordCompare(req.Password, user.Password)
+	ok := _utils.HashPasswordCompare(req.Password, user.GetPassword())
 	if !ok {
 		a.logger.Error().Err(err).Msg("Password doesn't match")
 		return "", dto.Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH
 	}
-
-	if user.TwoFactorEnabled {
+	if user.GetTwoFactorEnabled() {
+		a.logger.Debug().Str("userId", user.Id).Msg("Two-factor authentication enabled, generating OTP")
 		otp, err := utils.GenerateOTP()
 		if err != nil {
 			a.logger.Error().Err(err).Msg("generate OTP error")
