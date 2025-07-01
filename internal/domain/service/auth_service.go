@@ -197,7 +197,7 @@ func (a *authService) VerifyOTPService(otp, email string) (string, error) {
 		return "", err
 	}
 
-	token, err := jwt.GenerateToken(user.Id)
+	token, err := jwt.GenerateToken(user.Id, 1*time.Hour)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error JWT Signing")
 		return "", dto.Err_INTENAL_JWT_SIGNING
@@ -511,7 +511,7 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		return "", nil
 	}
 
-	token, err := jwt.GenerateToken(user.Id)
+	token, err := jwt.GenerateToken(user.Id, 1*time.Hour)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error JWT Signing")
 		return "", dto.Err_INTENAL_JWT_SIGNING

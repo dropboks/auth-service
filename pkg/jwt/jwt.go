@@ -8,14 +8,17 @@ import (
 	"github.com/spf13/viper"
 )
 
-func GenerateToken(userId string) (string, error) {
+func GenerateToken(userId string, timeDuration time.Duration) (string, error) {
 	jwtKey := []byte(viper.GetString("jwt.secret_key"))
-	expirationTime := time.Now().Add(1 * time.Hour)
+	var expirationTime *jwt.NumericDate
+	if timeDuration > 0 {
+		expirationTime = jwt.NewNumericDate(time.Now().Add(timeDuration))
+	}
 
 	claims := &Claims{
 		UserId: userId,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			ExpiresAt: expirationTime,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    viper.GetString("app.name"),
 		},
