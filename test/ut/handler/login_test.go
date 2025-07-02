@@ -53,7 +53,7 @@ func (l *LoginHandlerSuite) TestAuthHandler_LoginHandler_Success() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	request := httptest.NewRequest("POST", "/v1/login", reqBody)
+	request := httptest.NewRequest("POST", "/login", reqBody)
 	request.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
