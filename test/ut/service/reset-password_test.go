@@ -32,8 +32,8 @@ func (r *ResetPasswordServiceSuite) SetupSuite() {
 	mockJetStream := new(mocks.MockJetStreamInfra)
 	mockGenerator := new(mocks.MockRandomGenerator)
 
-	// logger := zerolog.Nop()
-	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+	logger := zerolog.Nop()
+	// logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 	r.mockAuthRepo = mockAuthRepo
 	r.mockUserClient = mockUserClient
 	r.mockFileClient = mockFileClient

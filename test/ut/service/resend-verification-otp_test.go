@@ -32,8 +32,8 @@ func (r *ResendVerificationOTPServiceSuite) SetupSuite() {
 	mockJetStream := new(mocks.MockJetStreamInfra)
 	mockGenerator := new(mocks.MockRandomGenerator)
 
-	// logger := zerolog.Nop()
-	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+	logger := zerolog.Nop()
+	// logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 	r.mockAuthRepo = mockAuthRepo
 	r.mockUserClient = mockUserClient
 	r.mockFileClient = mockFileClient
@@ -101,4 +101,3 @@ func (r *ResendVerificationOTPServiceSuite) TestAuthService_ResendVerificationOT
 
 	r.mockUserClient.AssertExpectations(r.T())
 }
-
