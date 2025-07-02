@@ -217,6 +217,7 @@ func (a *authService) ResendVerificationService(email string) error {
 		return err
 	}
 	if user.GetVerified() {
+		a.logger.Error().Msg("user already verified")
 		return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
 	}
 	verificationToken, err := a.g.GenerateToken()
