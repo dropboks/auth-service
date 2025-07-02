@@ -177,6 +177,7 @@ func (l *LoginServiceSuite) TestAuthService_LoginService_WithTwoFactor() {
 	l.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
 		return email.Email == loginReq.Email
 	})).Return(mockUser, nil)
+	l.mockGenerator.On("GenerateOTP").Return("123456", nil)
 
 	l.mockAuthRepo.On("SetResource", mock.Anything, "OTP:user-id-123", mock.AnythingOfType("string"), mock.Anything).Return(nil)
 	l.mockJetStream.On("Publish", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("[]uint8")).Return(mockPubAck, nil)
