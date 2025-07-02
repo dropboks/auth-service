@@ -314,7 +314,7 @@ func (a *authHandler) Register(ctx *gin.Context) {
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
-		} else if err == dto.Err_BAD_REQUEST_WRONG_EXTENTION {
+		} else if err == dto.Err_BAD_REQUEST_WRONG_EXTENSION {
 			res := utils.ReturnResponseError(400, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 			return
@@ -381,7 +381,7 @@ func (a *authHandler) Verify(ctx *gin.Context) {
 		return
 	}
 	ctx.Header("User-Data", fmt.Sprintf(`{"user_id":"%s"}`, userId))
-	ctx.Status(http.StatusNoContent)
+	ctx.AbortWithStatus(http.StatusNoContent)
 }
 
 func (a *authHandler) Logout(ctx *gin.Context) {
