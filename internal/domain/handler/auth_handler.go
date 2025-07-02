@@ -136,7 +136,7 @@ func (a *authHandler) ResendVerificationOTP(ctx *gin.Context) {
 func (a *authHandler) VerifyOTP(ctx *gin.Context) {
 	var req dto.VerifyOTPRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		res := utils.ReturnResponseError(http.StatusBadRequest, "missing otp")
+		res := utils.ReturnResponseError(http.StatusBadRequest, "invalid input")
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}
@@ -360,6 +360,10 @@ func (a *authHandler) Verify(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, "Token is missing")
 		return
 	}
+	if len(token) < 7 {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, "Invalid token format")
+		return
+	}
 	token = token[7:]
 	userId, err := a.authService.VerifyService(token)
 	if err != nil {
@@ -390,6 +394,10 @@ func (a *authHandler) Logout(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, "Token is missing")
 		return
 	}
+	if len(token) < 7 {
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, "Invalid token format")
+		return
+	}
 	token = token[7:]
 	err := a.authService.LogoutService(token)
 	if err != nil {
@@ -403,5 +411,5 @@ func (a *authHandler) Logout(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 		return
 	}
-	ctx.Status(http.StatusNoContent)
+	ctx.AbortWithStatus(http.StatusNoContent)
 }
