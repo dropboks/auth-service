@@ -261,14 +261,17 @@ func (a *authService) VerifyEmailService(userId, token, changeToken string) erro
 		key = fmt.Sprintf("changeEmailToken:%s", userId)
 		rToken, err := a.authRepository.GetResource(ctx, key)
 		if err != nil {
+			a.logger.Error().Err(err).Msg("failed to get resource")
 			return err
 		}
 		if changeToken != rToken {
+			a.logger.Error().Msg("token not match")
 			return dto.Err_UNAUTHORIZED_TOKEN_INVALID
 		}
 		newEmailkey := fmt.Sprintf("newEmail:%s", userId)
 		newEmail, err := a.authRepository.GetResource(ctx, newEmailkey)
 		if err != nil {
+			a.logger.Error().Err(err).Msg("failed to get resource")
 			return err
 		}
 		updatedUser = &upb.User{
@@ -282,26 +285,32 @@ func (a *authService) VerifyEmailService(userId, token, changeToken string) erro
 		}
 		_, err = a.userServiceClient.UpdateUser(ctx, updatedUser)
 		if err != nil {
+			a.logger.Error().Err(err).Msg("failed to update user")
 			return err
 		}
 		err = a.authRepository.RemoveResource(ctx, key)
 		if err != nil {
+			a.logger.Error().Err(err).Msg("failed to remove resource")
 			return err
 		}
 		err = a.authRepository.RemoveResource(ctx, newEmailkey)
 		if err != nil {
+			a.logger.Error().Err(err).Msg("failed to remove resource")
 			return err
 		}
 	} else {
 		if user.GetVerified() {
+			a.logger.Error().Msg("user already verified")
 			return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
 		}
 		key = fmt.Sprintf("verificationToken:%s", userId)
 		rToken, err := a.authRepository.GetResource(ctx, key)
 		if err != nil {
+			a.logger.Error().Err(err).Msg("failed to get resource")
 			return err
 		}
 		if token != rToken {
+			a.logger.Error().Msg("token not match")
 			return dto.Err_UNAUTHORIZED_TOKEN_INVALID
 		}
 
@@ -316,10 +325,12 @@ func (a *authService) VerifyEmailService(userId, token, changeToken string) erro
 		}
 		_, err = a.userServiceClient.UpdateUser(ctx, updatedUser)
 		if err != nil {
+			a.logger.Error().Err(err).Msg("failed to update user")
 			return err
 		}
 		err = a.authRepository.RemoveResource(ctx, key)
 		if err != nil {
+			a.logger.Error().Err(err).Msg("failed to remove resource")
 			return err
 		}
 	}
