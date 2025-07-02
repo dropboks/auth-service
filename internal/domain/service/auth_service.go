@@ -13,7 +13,6 @@ import (
 	"github.com/dropboks/auth-service/pkg/constant"
 	"github.com/dropboks/auth-service/pkg/generators"
 	"github.com/dropboks/auth-service/pkg/jwt"
-	utils "github.com/dropboks/auth-service/pkg/utils"
 	fpb "github.com/dropboks/proto-file/pkg/fpb"
 	upb "github.com/dropboks/proto-user/pkg/upb"
 	_dto "github.com/dropboks/sharedlib/dto"
@@ -144,7 +143,7 @@ func (a *authService) ResendVerificationOTPService(email string) error {
 		a.logger.Error().Err(err).Msg("error from user_service")
 		return err
 	}
-	otp, err := utils.GenerateOTP()
+	otp, err := a.g.GenerateOTP()
 	if err != nil {
 		a.logger.Error().Err(err).Msg("generate OTP error")
 		return dto.Err_INTERNAL_GENERATE_OTP
@@ -492,7 +491,7 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 	}
 	if user.GetTwoFactorEnabled() {
 		a.logger.Debug().Str("userId", user.Id).Msg("Two-factor authentication enabled, generating OTP")
-		otp, err := utils.GenerateOTP()
+		otp, err := a.g.GenerateOTP()
 		if err != nil {
 			a.logger.Error().Err(err).Msg("generate OTP error")
 			return "", dto.Err_INTERNAL_GENERATE_OTP
