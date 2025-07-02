@@ -378,7 +378,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 	if req.Image != nil && req.Image.Filename != "" {
 		ext = _utils.GetFileNameExtension(req.Image.Filename)
 		if ext != "jpg" && ext != "jpeg" && ext != "png" {
-			return dto.Err_BAD_REQUEST_WRONG_EXTENTION
+			return dto.Err_BAD_REQUEST_WRONG_EXTENSION
 		}
 		if req.Image.Size > constant.MAX_UPLOAD_SIZE {
 			return dto.Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED

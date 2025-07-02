@@ -16,7 +16,7 @@ var (
 var (
 	Err_BAD_REQUEST                       = errors.New("invalid input")
 	Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH = errors.New("password and confirm password doesn't match")
-	Err_BAD_REQUEST_WRONG_EXTENTION       = errors.New("error file extension, support jpg, jpeg, and png")
+	Err_BAD_REQUEST_WRONG_EXTENSION       = errors.New("error file extension, support jpg, jpeg, and png")
 	Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED   = errors.New("max size exceeded: 6mb")
 
 	Err_CONFLICT_EMAIL_EXIST           = errors.New("user with this email exist")
