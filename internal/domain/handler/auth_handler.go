@@ -271,18 +271,6 @@ func (a *authHandler) Login(ctx *gin.Context) {
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
-		} else if err == dto.Err_INTENAL_JWT_SIGNING {
-			res := utils.ReturnResponseError(500, err.Error())
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
-			return
-		} else if err == dto.Err_INTERNAL_SET_RESOURCE {
-			res := utils.ReturnResponseError(500, "failed to set token")
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
-			return
-		} else if err == dto.Err_INTERNAL_GENERATE_OTP {
-			res := utils.ReturnResponseError(500, "failed to set token")
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
-			return
 		}
 		code := status.Code(err)
 		message := status.Convert(err).Message()
