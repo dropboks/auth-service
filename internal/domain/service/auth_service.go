@@ -95,6 +95,9 @@ func (a *authService) ChangePasswordService(userId string, resetPasswordToken st
 	if err != nil {
 		return err
 	}
+	if err := a.authRepository.RemoveResource(ctx, key); err != nil {
+		return err
+	}
 	return nil
 }
 
