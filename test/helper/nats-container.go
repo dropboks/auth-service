@@ -14,7 +14,7 @@ type NatsContainer struct {
 	URI       string
 }
 
-func StartNatsContainer(ctx context.Context) (*NatsContainer, error) {
+func StartNatsContainer(ctx context.Context, sharedNetwork string) (*NatsContainer, error) {
 	req := testcontainers.ContainerRequest{
 		Name:         "nats",
 		Image:        "nats:2.11.6",
@@ -24,6 +24,7 @@ func StartNatsContainer(ctx context.Context) (*NatsContainer, error) {
 			"NATS_USER":     viper.GetString("minio.credential.user"),
 			"NATS_PASSWORD": viper.GetString("minio.credential.password"),
 		},
+		Networks: []string{sharedNetwork},
 		Cmd: []string{
 			"-c", "/etc/nats/nats.conf",
 			"--name", "nats",

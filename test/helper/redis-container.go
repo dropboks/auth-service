@@ -14,7 +14,7 @@ type RedisContainer struct {
 	URI string
 }
 
-func StartRedisContainer(ctx context.Context) (*RedisContainer, error) {
+func StartRedisContainer(ctx context.Context, sharedNetwork string) (*RedisContainer, error) {
 
 	req := testcontainers.ContainerRequest{
 		Name:         "redis",
@@ -23,6 +23,7 @@ func StartRedisContainer(ctx context.Context) (*RedisContainer, error) {
 		Env: map[string]string{
 			"REDIS_PASSWORD": viper.GetString("redis.password"),
 		},
+		Networks:   []string{sharedNetwork},
 		Cmd:        []string{"redis-server", "--requirepass", viper.GetString("redis.password")},
 		WaitingFor: wait.ForListeningPort("6379/tcp"),
 	}

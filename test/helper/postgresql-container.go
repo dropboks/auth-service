@@ -19,7 +19,7 @@ type PostgresContainer struct {
 	DBName    string
 }
 
-func StartPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
+func StartPostgresContainer(ctx context.Context, sharedNetwork string) (*PostgresContainer, error) {
 	req := testcontainers.ContainerRequest{
 		Name:         "db",
 		Image:        "postgres:17.5-alpine3.22",
@@ -29,6 +29,7 @@ func StartPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 			"POSTGRES_USER":     viper.GetString("database.user"),
 			"POSTGRES_PASSWORD": viper.GetString("database.password"),
 		},
+		Networks: []string{sharedNetwork},
 		WaitingFor: wait.ForLog("database system is ready to accept connections").
 			WithOccurrence(2).WithStartupTimeout(5 * time.Second),
 		Files: []testcontainers.ContainerFile{

@@ -17,7 +17,7 @@ type MinioContainer struct {
 	SecretKey string
 }
 
-func StartMinioContainer(ctx context.Context) (*MinioContainer, error) {
+func StartMinioContainer(ctx context.Context, sharedNetwork string) (*MinioContainer, error) {
 	var (
 		minioImage  = "minio/minio:RELEASE.2025-05-24T17-08-30Z-cpuv1"
 		accessKey   = viper.GetString("minio.credential.user")
@@ -32,6 +32,7 @@ func StartMinioContainer(ctx context.Context) (*MinioContainer, error) {
 			"MINIO_ROOT_USER":     accessKey,
 			"MINIO_ROOT_PASSWORD": secretKey,
 		},
+		Networks:   []string{sharedNetwork},
 		Cmd:        []string{"server", "/data"},
 		WaitingFor: wait.ForLog("API:").WithStartupTimeout(30 * time.Second),
 	}
