@@ -9,12 +9,17 @@ import (
 func Load() {
 	env := os.Getenv("ENV")
 	configName := "config"
-	if env != "production" {
+	configpath := "."
+	switch env {
+	case "production":
 		configName = "config.local"
+	case "test":
+		configName = "config.test"
+		configpath = "../../"
 	}
 	viper.SetConfigName(configName)
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+	viper.AddConfigPath(configpath)
 	if err := viper.ReadInConfig(); err != nil {
 		panic("failed to read config")
 	}
