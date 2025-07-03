@@ -56,11 +56,12 @@ func (a *authHandler) ChangePassword(ctx *gin.Context) {
 		return
 	}
 	if err := a.authService.ChangePasswordService(userId, resetPasswordtoken, &req); err != nil {
-		if err == dto.Err_UNAUTHORIZED_TOKEN_INVALID {
+		switch err {
+		case dto.Err_UNAUTHORIZED_TOKEN_INVALID:
 			res := utils.ReturnResponseError(401, "invalid token")
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
-		} else if err == dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH {
+		case dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH:
 			res := utils.ReturnResponseError(400, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 			return
@@ -116,11 +117,12 @@ func (a *authHandler) ResendVerificationOTP(ctx *gin.Context) {
 	if err := a.authService.ResendVerificationOTPService(req.Email); err != nil {
 		code := status.Code(err)
 		message := status.Convert(err).Message()
-		if code == codes.NotFound {
+		switch code {
+		case codes.NotFound:
 			res := utils.ReturnResponseError(404, message)
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
-		} else if code == codes.Internal {
+		case codes.Internal:
 			res := utils.ReturnResponseError(500, message)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
@@ -142,22 +144,24 @@ func (a *authHandler) VerifyOTP(ctx *gin.Context) {
 	}
 	token, err := a.authService.VerifyOTPService(req.OTP, req.Email)
 	if err != nil {
-		if err == dto.Err_UNAUTHORIZED_OTP_INVALID {
+		switch err {
+		case dto.Err_UNAUTHORIZED_OTP_INVALID:
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
-		} else if err == dto.Err_NOTFOUND_KEY_NOTFOUND {
+		case dto.Err_NOTFOUND_KEY_NOTFOUND:
 			res := utils.ReturnResponseError(404, "otp is invalid")
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
 		}
 		code := status.Code(err)
 		message := status.Convert(err).Message()
-		if code == codes.NotFound {
+		switch code {
+		case codes.NotFound:
 			res := utils.ReturnResponseError(404, message)
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
-		} else if code == codes.Internal {
+		case codes.Internal:
 			res := utils.ReturnResponseError(500, message)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
@@ -178,11 +182,12 @@ func (a *authHandler) ResendVerficationEmail(ctx *gin.Context) {
 		return
 	}
 	if err := a.authService.ResendVerificationService(req.Email); err != nil {
-		if err == dto.Err_CONFLICT_USER_ALREADY_VERIFIED {
+		switch err {
+		case dto.Err_CONFLICT_USER_ALREADY_VERIFIED:
 			res := utils.ReturnResponseError(409, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusConflict, res)
 			return
-		} else if err == dto.Err_INTERNAL_GENERATE_TOKEN || err == dto.Err_INTERNAL_PUBLISH_MESSAGE {
+		case dto.Err_INTERNAL_GENERATE_TOKEN, dto.Err_INTERNAL_PUBLISH_MESSAGE:
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
@@ -190,11 +195,12 @@ func (a *authHandler) ResendVerficationEmail(ctx *gin.Context) {
 
 		code := status.Code(err)
 		message := status.Convert(err).Message()
-		if code == codes.NotFound {
+		switch code {
+		case codes.NotFound:
 			res := utils.ReturnResponseError(404, message)
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
-		} else if code == codes.Internal {
+		case codes.Internal:
 			res := utils.ReturnResponseError(500, message)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
@@ -217,30 +223,32 @@ func (a *authHandler) VerifyEmail(ctx *gin.Context) {
 		return
 	}
 	if err := a.authService.VerifyEmailService(userId, token, changeEmailToken); err != nil {
-		if err == dto.Err_UNAUTHORIZED_TOKEN_INVALID {
+		switch err {
+		case dto.Err_UNAUTHORIZED_TOKEN_INVALID:
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
-		} else if err == dto.Err_CONFLICT_USER_ALREADY_VERIFIED {
+		case dto.Err_CONFLICT_USER_ALREADY_VERIFIED:
 			res := utils.ReturnResponseError(409, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusConflict, res)
 			return
-		} else if err == dto.Err_NOTFOUND_KEY_NOTFOUND {
+		case dto.Err_NOTFOUND_KEY_NOTFOUND:
 			res := utils.ReturnResponseError(404, "verification token is not found")
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
-		} else if err == dto.Err_INTERNAL_DELETE_RESOURCE {
+		case dto.Err_INTERNAL_DELETE_RESOURCE:
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
 		}
 		code := status.Code(err)
 		message := status.Convert(err).Message()
-		if code == codes.NotFound {
+		switch code {
+		case codes.NotFound:
 			res := utils.ReturnResponseError(404, message)
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
-		} else if code == codes.Internal {
+		case codes.Internal:
 			res := utils.ReturnResponseError(500, message)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
@@ -263,22 +271,24 @@ func (a *authHandler) Login(ctx *gin.Context) {
 	}
 	token, err := a.authService.LoginService(req)
 	if err != nil {
-		if err == dto.Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH {
+		switch err {
+		case dto.Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH:
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
-		} else if err == dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED {
+		case dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED:
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
 		}
 		code := status.Code(err)
 		message := status.Convert(err).Message()
-		if code == codes.NotFound {
+		switch code {
+		case codes.NotFound:
 			res := utils.ReturnResponseError(404, message)
 			ctx.AbortWithStatusJSON(http.StatusNotFound, res)
 			return
-		} else if code == codes.Internal {
+		case codes.Internal:
 			res := utils.ReturnResponseError(500, message)
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
@@ -306,35 +316,36 @@ func (a *authHandler) Register(ctx *gin.Context) {
 	}
 	err := a.authService.RegisterService(req)
 	if err != nil {
-		if err == dto.Err_CONFLICT_EMAIL_EXIST {
+		switch err {
+		case dto.Err_CONFLICT_EMAIL_EXIST:
 			res := utils.ReturnResponseError(409, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusConflict, res)
 			return
-		} else if err == dto.Err_INTERNAL_CONVERT_IMAGE {
+		case dto.Err_INTERNAL_CONVERT_IMAGE:
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
-		} else if err == dto.Err_BAD_REQUEST_WRONG_EXTENSION {
+		case dto.Err_BAD_REQUEST_WRONG_EXTENSION:
 			res := utils.ReturnResponseError(400, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 			return
-		} else if err == dto.Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED {
+		case dto.Err_BAD_REQUEST_LIMIT_SIZE_EXCEEDED:
 			res := utils.ReturnResponseError(400, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 			return
-		} else if err == dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH {
+		case dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH:
 			res := utils.ReturnResponseError(400, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, res)
 			return
-		} else if err == dto.Err_INTENAL_JWT_SIGNING {
+		case dto.Err_INTENAL_JWT_SIGNING:
 			res := utils.ReturnResponseError(500, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
-		} else if err == dto.Err_INTERNAL_SET_RESOURCE {
+		case dto.Err_INTERNAL_SET_RESOURCE:
 			res := utils.ReturnResponseError(500, "failed to set verification token")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
-		} else if err == dto.Err_INTERNAL_GENERATE_TOKEN {
+		case dto.Err_INTERNAL_GENERATE_TOKEN:
 			res := utils.ReturnResponseError(500, "failed to set verification token")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
@@ -367,15 +378,16 @@ func (a *authHandler) Verify(ctx *gin.Context) {
 	token = token[7:]
 	userId, err := a.authService.VerifyService(token)
 	if err != nil {
-		if err == dto.Err_NOTFOUND_KEY_NOTFOUND {
+		switch err {
+		case dto.Err_NOTFOUND_KEY_NOTFOUND:
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
-		} else if err == dto.Err_UNAUTHORIZED_JWT_INVALID {
+		case dto.Err_UNAUTHORIZED_JWT_INVALID:
 			res := utils.ReturnResponseError(401, err.Error())
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
-		} else if err == dto.Err_INTERNAL_GET_RESOURCE {
+		case dto.Err_INTERNAL_GET_RESOURCE:
 			res := utils.ReturnResponseError(500, "failed to get token")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return
