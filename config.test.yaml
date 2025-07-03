@@ -1,0 +1,60 @@
+database:
+  host: "localhost"
+  user: "user_test"
+  password: "password_test"
+  port: "5432"
+  name: "testdb"
+  sslmode: false
+
+app:
+  name: "test_app_name"
+  url: "http://localhost:8181"
+  http:
+    port: 8181
+  grpc:
+    service:
+      user_service: 127.0.0.1:50551
+      file_service: 127.0.0.1:50552
+
+redis:
+  address: "localhost"
+  port: "6379"
+  client_name: "auth_service_test"
+  password: "password_test"
+
+minio:
+  host: "localhost"
+  port: 9000
+  credential:
+    user: "user_test"
+    password: "password_test"
+
+nats:
+  protocol: "nats"
+  address: "localhost"
+  port: "4221"
+  credential:
+    user: "user_test"
+    password: "password_test"
+  connection_name: "authentication_service_conn_test"
+  timeout: 10
+
+jetstream:
+  stream: 
+    name: "notification_stream_test"
+    description: "this is notification stream"
+  subject:
+    global: "test_notif.>"
+    mail: "test_notif.email"
+
+server:
+  cors:
+    allow_origins: "*"
+    allow_methods: "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    allow_headers: "Content-Type, Authorization, X-Requested-With, X-CSRF-Token, Accept, Origin, Cache-Control, X-File-Name, X-File-Type, X-File-Size"
+    expose_headers: "Content-Length, Content-Range"
+    max_age: 86400
+    allow_credential: true
+
+jwt:
+  secret_key: "jwt_secret_test"

@@ -1,15 +1,12 @@
-database:
-  host:
-  user:
-  password:
-  port:
-  name:
-  sslmode:
-
 app:
-  name:
+  name: 
+  url: 
   http:
     port:
+  grpc:
+    service:
+      user_service: 
+      file_service: 
 
 redis:
   address: 
@@ -17,14 +14,32 @@ redis:
   client_name: 
   password: 
 
+nats:
+  protocol: 
+  address: 
+  port: 
+  credential:
+    user: 
+    password: 
+  connection_name: 
+  timeout: 
+
+jetstream:
+  stream: 
+    name: 
+    description: 
+  subject:
+    global: 
+    mail: 
+
 server:
   cors:
-    allow_origins:
-    allow_methods:
-    allow_headers:
-    expose_headers:
-    max_age:
-    allow_credential:
+    allow_origins: "*"
+    allow_methods: "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    allow_headers: "Content-Type, Authorization, X-Requested-With, X-CSRF-Token, Accept, Origin, Cache-Control, X-File-Name, X-File-Type, X-File-Size"
+    expose_headers: "Content-Length, Content-Range"
+    max_age: 86400
+    allow_credential: true
 
 jwt:
-  secret_key:
+  secret_key: 
