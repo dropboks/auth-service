@@ -427,11 +427,13 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 
 	userId := a.g.GenerateUUID()
 	user := &upb.User{
-		Id:       userId,
-		FullName: strings.TrimSpace(req.FullName),
-		Image:    imageName,
-		Email:    req.Email,
-		Password: password,
+		Id:               userId,
+		FullName:         strings.TrimSpace(req.FullName),
+		Image:            imageName,
+		Email:            req.Email,
+		Password:         password,
+		Verified:         false,
+		TwoFactorEnabled: false,
 	}
 	_, err = a.userServiceClient.CreateUser(ctx, user)
 	if err != nil && req.Image != nil && req.Image.Filename != "" {
@@ -481,7 +483,6 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		a.logger.Error().Err(err).Msg("Error Query Get User By Email")
 		return "", err
 	}
-
 	if !user.GetVerified() {
 		a.logger.Error().Msgf("user not verified :%s", user.GetEmail())
 		return "", dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
