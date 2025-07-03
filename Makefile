@@ -33,8 +33,11 @@ pre-commit:
 	@echo "Running go vet..."
 	@go vet ./... || (echo "[FAIL] go vet failed." && exit 1)
 
-	@echo "Running go test (unit testing and integration testing)..."
-	@go test ./test/it/... ./test/ut/... || (echo "[FAIL] Tests failed." && exit 1)
+	@echo "Running go test (unit testing )..."
+	@go test ./test/ut/... -v || (echo "[FAIL] Unit testing failed." && exit 1)
+
+	@echo "Running go test (integration testing)..."
+	@go test ./test/it/... -v || (echo "[FAIL] Integration testing failed." && exit 1)
 
 	@echo "[SUCCESS] Pre-commit checks passed!"
 
