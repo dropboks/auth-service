@@ -56,7 +56,7 @@ func (s *Server) Run() {
 			}
 
 			quit := make(chan os.Signal, 1)
-			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 			<-quit
 			logger.Info().Msg("Shutting down server...")
 
