@@ -5,6 +5,7 @@ import (
 
 	"github.com/dropboks/auth-service/internal/domain/dto"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/spf13/viper"
 )
 
@@ -21,6 +22,7 @@ func GenerateToken(userId string, timeDuration time.Duration) (string, error) {
 			ExpiresAt: expirationTime,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    viper.GetString("app.name"),
+			ID:        uuid.NewString(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
