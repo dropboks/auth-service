@@ -15,6 +15,7 @@ app:
     service:
       user_service: 127.0.0.1:50051
       file_service: 127.0.0.1:50052
+  verification_url: "verify-email?"
 
 redis:
   address: "localhost"

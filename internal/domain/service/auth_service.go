@@ -232,7 +232,7 @@ func (a *authService) ResendVerificationService(email string) error {
 		a.logger.Error().Err(err).Msg("failed to set verification token")
 		return err
 	}
-	link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), "auth/verify-email?", user.GetId(), verificationToken)
+	link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), viper.GetString("app.verification_url"), user.GetId(), verificationToken)
 	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.GetId())
 	msg := &_dto.MailNotificationMessage{
 		Receiver: []string{email},
@@ -459,7 +459,7 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 
 	go func() {
 
-		link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), "auth/verify-email?", userId, verificationToken)
+		link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), viper.GetString("app.verification_url"), userId, verificationToken)
 		subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), userId)
 		msg := &_dto.MailNotificationMessage{
 			Receiver: []string{user.Email},
