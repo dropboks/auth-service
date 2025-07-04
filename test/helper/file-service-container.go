@@ -13,7 +13,7 @@ type FileServiceContainer struct {
 func StartFileServiceContainer(ctx context.Context, sharedNetwork string) (*FileServiceContainer, error) {
 	req := testcontainers.ContainerRequest{
 		Name:         "file_service",
-		Image:        "file_service:test",
+		Image:        "file_service:v0.0.1",
 		ExposedPorts: []string{"50052:50052/tcp"},
 		Env:          map[string]string{"ENV": "test-dependence"},
 		Networks:     []string{sharedNetwork},

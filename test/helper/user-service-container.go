@@ -13,7 +13,7 @@ type UserServiceContainer struct {
 func StartUserServiceContainer(ctx context.Context, sharedNetwork string) (*UserServiceContainer, error) {
 	req := testcontainers.ContainerRequest{
 		Name:         "user_service",
-		Image:        "user_service:test",
+		Image:        "user_service:v0.0.1",
 		ExposedPorts: []string{"50051:50051/tcp"},
 		Env:          map[string]string{"ENV": "test-dependence"},
 		Networks:     []string{sharedNetwork},
