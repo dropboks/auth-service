@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"syscall"
 	"testing"
 
@@ -29,15 +30,14 @@ type LoginITSuite struct {
 	network              *testcontainers.DockerNetwork
 	pgContainer          *helper.PostgresContainer
 	redisContainer       *helper.RedisContainer
-	minioContainer       *helper.MinioContainer
 	natsContainer        *helper.NatsContainer
 	userServiceContainer *helper.UserServiceContainer
-	fileServiceContainer *helper.FileServiceContainer
 
 	userServiceClient upb.UserServiceClient
 }
 
 func (l *LoginITSuite) SetupSuite() {
+	exec.Command("docker", "rm", "-f", "db").Run()
 	log.Println("Setting up integration test suite for LoginITSuite")
 	l.ctx = context.Background()
 	gin.SetMode(gin.TestMode)
@@ -61,13 +61,6 @@ func (l *LoginITSuite) SetupSuite() {
 	}
 	l.redisContainer = rContainer
 
-	// spawn minio
-	mContainer, err := helper.StartMinioContainer(l.ctx, l.network.Name)
-	if err != nil {
-		log.Fatalf("failed starting minio container: %s", err)
-	}
-	l.minioContainer = mContainer
-
 	// spawn nats
 	nContainer, err := helper.StartNatsContainer(l.ctx, l.network.Name)
 	if err != nil {
@@ -75,21 +68,13 @@ func (l *LoginITSuite) SetupSuite() {
 	}
 	l.natsContainer = nContainer
 
-	// spawn user service
 	uContainer, err := helper.StartUserServiceContainer(l.ctx, l.network.Name)
 	if err != nil {
+		log.Fatal(err)
 		log.Println("make sure the image is exist")
 		log.Fatalf("failed starting user service container: %s", err)
 	}
 	l.userServiceContainer = uContainer
-
-	// spawn file service
-	fContainer, err := helper.StartFileServiceContainer(l.ctx, l.network.Name)
-	if err != nil {
-		log.Println("make sure the image is exist")
-		log.Fatalf("failed starting file service container: %s", err)
-	}
-	l.fileServiceContainer = fContainer
 
 	grpcManager := grpc.NewGRPCClientManager()
 	l.userServiceClient = grpc.NewUserServiceConnection(grpcManager)
@@ -104,14 +89,8 @@ func (l *LoginITSuite) SetupSuite() {
 	<-serverReady
 }
 func (l *LoginITSuite) TearDownSuite() {
-	if err := l.pgContainer.Terminate(l.ctx); err != nil {
-		log.Fatalf("error terminating postgres container: %s", err)
-	}
 	if err := l.redisContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating redis container: %s", err)
-	}
-	if err := l.minioContainer.Terminate(l.ctx); err != nil {
-		log.Fatalf("error terminating minio container: %s", err)
 	}
 	if err := l.natsContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
@@ -119,10 +98,9 @@ func (l *LoginITSuite) TearDownSuite() {
 	if err := l.userServiceContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
 	}
-	if err := l.fileServiceContainer.Terminate(l.ctx); err != nil {
-		log.Fatalf("error terminating file service container: %s", err)
+	if err := l.pgContainer.Terminate(l.ctx); err != nil {
+		log.Fatalf("error terminating postgres container: %s", err)
 	}
-
 	p, _ := os.FindProcess(syscall.Getpid())
 	_ = p.Signal(syscall.SIGINT)
 	log.Println("Tear Down integration test suite for LoginITSuite")
