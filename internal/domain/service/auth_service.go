@@ -362,8 +362,13 @@ func (a *authService) VerifyService(token string) (string, error) {
 
 func (a *authService) LogoutService(token string) error {
 	c := context.Background()
-	key := "session:" + token
-	err := a.authRepository.RemoveResource(c, key)
+	claims, err := jwt.ValidateJWT(token)
+	if err != nil {
+		a.logger.Error().Err(err).Msg("invalid jwt")
+		return err
+	}
+	key := "session:" + claims.UserId
+	err = a.authRepository.RemoveResource(c, key)
 	if err != nil {
 		return err
 	}

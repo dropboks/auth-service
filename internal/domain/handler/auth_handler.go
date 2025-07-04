@@ -413,7 +413,12 @@ func (a *authHandler) Logout(ctx *gin.Context) {
 	token = token[7:]
 	err := a.authService.LogoutService(token)
 	if err != nil {
-		if err == dto.Err_INTERNAL_DELETE_RESOURCE {
+		switch err {
+		case dto.Err_UNAUTHORIZED_JWT_INVALID:
+			res := utils.ReturnResponseError(401, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+			return
+		case dto.Err_INTERNAL_DELETE_RESOURCE:
 			res := utils.ReturnResponseError(500, "failed to delete token")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, res)
 			return

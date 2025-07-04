@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dropboks/auth-service/internal/domain/dto"
 	"github.com/dropboks/auth-service/internal/domain/handler"
 	"github.com/dropboks/auth-service/test/mocks"
 	"github.com/gin-gonic/gin"
@@ -75,4 +76,21 @@ func (v *LogoutHandlerSuite) TestAuthHandler_LogoutHandler_InvalidFormat() {
 	v.authHandler.Logout(ctx)
 
 	v.Equal(http.StatusUnauthorized, w.Code)
+}
+
+func (v *LogoutHandlerSuite) TestAuthHandler_LogoutHandler_InvalidToken() {
+	token := "Bearer validtoken"
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest("POST", "/logout", nil)
+	ctx.Request.Header.Set("Authorization", token)
+
+	v.mockAuthService.On("LogoutService", "validtoken").Return(dto.Err_UNAUTHORIZED_JWT_INVALID)
+
+	v.authHandler.Logout(ctx)
+
+	v.Equal(http.StatusUnauthorized, w.Code)
+
+	v.mockAuthService.AssertExpectations(v.T())
 }

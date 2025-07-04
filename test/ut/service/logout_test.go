@@ -57,7 +57,8 @@ func TestLogoutServiceSuite(t *testing.T) {
 }
 
 func (l *LogoutServiceSuite) TestAuthService_LogoutService_Success() {
-	jwt := "access-token"
+	jwt := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoidXNlci1pZC0xMjMiLCJpYXQiOjE3NTEzNjEzOTJ9.CwkzkHgPYAxd6TXG4_ooMFczGvjn3Qr2_7T6W6YCDgI"
+
 	l.mockAuthRepo.On("RemoveResource", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	err := l.authService.LogoutService(jwt)
@@ -65,4 +66,11 @@ func (l *LogoutServiceSuite) TestAuthService_LogoutService_Success() {
 	assert.NoError(l.T(), err)
 
 	l.mockAuthRepo.AssertExpectations(l.T())
+}
+func (l *LogoutServiceSuite) TestAuthService_LogoutService_TokenInvalid() {
+	jwt := "access-token"
+
+	err := l.authService.LogoutService(jwt)
+
+	assert.Error(l.T(), err)
 }
