@@ -348,3 +348,23 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_KeyNotFound() {
 	v.Equal(http.StatusNotFound, verifyResponse.StatusCode)
 	v.Contains(string(verifyBody), "verification token is not found")
 }
+
+func (v *VerifyEmailITSuite) TestVerifyEmailIT_UserNotFound() {
+	link := "http://localhost:8181/verify-email?userid=examplerandom&token=random-token-that-is-not-valid"
+	client := http.Client{}
+	re := regexp.MustCompile(`userid=([^&]+)`)
+	randomUserID := fmt.Sprintf("random-%d", time.Now().UnixNano())
+	modifiedLink := re.ReplaceAllString(link, fmt.Sprintf("userid=%s", randomUserID))
+
+	verifyRequest, err := http.NewRequest(http.MethodGet, modifiedLink, nil)
+	v.NoError(err)
+
+	verifyResponse, err := client.Do(verifyRequest)
+	v.NoError(err)
+
+	verifyBody, err := io.ReadAll(verifyResponse.Body)
+	v.NoError(err)
+
+	v.Equal(http.StatusNotFound, verifyResponse.StatusCode)
+	v.Contains(string(verifyBody), "user not found")
+}
