@@ -13,8 +13,8 @@ app:
     port: 8181
   grpc:
     service:
-      user_service: 127.0.0.1:50551
-      file_service: 127.0.0.1:50552
+      user_service: 127.0.0.1:50051
+      file_service: 127.0.0.1:50052
 
 redis:
   address: "localhost"
