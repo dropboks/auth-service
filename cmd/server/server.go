@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -38,6 +39,7 @@ func (s *Server) Run() {
 			defer redis.Close()
 			defer nc.Drain()
 
+			router.Use(gin.Recovery())
 			handler.AuthRoutes(router, ah)
 			srv := &http.Server{
 				Addr:    ":" + viper.GetString("app.http.port"),
@@ -52,7 +54,15 @@ func (s *Server) Run() {
 			}()
 
 			if s.ServerReady != nil {
-				s.ServerReady <- true
+				for range 50 { // try for up to 5 seconds
+					conn, err := net.DialTimeout("tcp", ":"+viper.GetString("app.http.port"), 100*time.Millisecond)
+					if err == nil {
+						conn.Close()
+						s.ServerReady <- true
+						break
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
 			}
 
 			quit := make(chan os.Signal, 1)
