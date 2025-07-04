@@ -23,6 +23,7 @@ import (
 	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
 	"github.com/dropboks/auth-service/test/helper"
 	"github.com/dropboks/proto-user/pkg/upb"
+	"github.com/dropboks/sharedlib/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
@@ -367,4 +368,118 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_UserNotFound() {
 
 	v.Equal(http.StatusNotFound, verifyResponse.StatusCode)
 	v.Contains(string(verifyBody), "user not found")
+}
+
+func (v *VerifyEmailITSuite) TestVerifyEmailIT_ChangeTokenSuccess() {
+	// - register
+	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+
+	request := helper.Register(email, v.T())
+
+	client := http.Client{}
+	registerResponse, err := client.Do(request)
+	v.NoError(err)
+	registerResponseBody, err := io.ReadAll(registerResponse.Body)
+	v.NoError(err)
+
+	v.Equal(http.StatusCreated, registerResponse.StatusCode)
+	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
+
+	link := helper.RetrieveDataFromEmail(email, v.T())
+
+	// - verify-email
+	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
+	v.NoError(err)
+
+	verifyResponse, err := client.Do(verifyRequest)
+	v.NoError(err)
+
+	verifyBody, err := io.ReadAll(verifyResponse.Body)
+	v.NoError(err)
+
+	v.Equal(http.StatusOK, verifyResponse.StatusCode)
+	v.Contains(string(verifyBody), "Verification Success")
+
+	// - login
+	reqBody := &bytes.Buffer{}
+
+	encoder := gin.H{
+		"email":    email,
+		"password": "password123",
+	}
+	_ = json.NewEncoder(reqBody).Encode(encoder)
+
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/login", reqBody)
+	v.NoError(err)
+
+	response, err := client.Do(req)
+	v.NoError(err)
+
+	byteBody, err := io.ReadAll(response.Body)
+	v.NoError(err)
+
+	v.Equal(http.StatusOK, response.StatusCode)
+	v.Contains(string(byteBody), "Login Success")
+
+	// - verify
+
+	var respData map[string]interface{}
+	err = json.Unmarshal(byteBody, &respData)
+	v.NoError(err)
+
+	jwt, ok := respData["data"].(string)
+	v.True(ok, "expected jwt token in data field")
+
+	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify", nil)
+	v.NoError(err)
+	verifyReq.Header.Set("Authorization", "Bearer "+jwt)
+
+	verifyResp, err := client.Do(verifyReq)
+	v.NoError(err)
+	defer verifyResp.Body.Close()
+
+	v.Equal(http.StatusNoContent, verifyResp.StatusCode)
+
+	// get the response header user data -> pass to update email header in
+	// userDataHeader := c.Request.Header.Get("User-Data")
+	// UserId string `json:"user_id"`
+	userDataHeader := verifyResp.Header.Get("User-Data")
+	v.NotEmpty(userDataHeader, "User-Data header should not be empty")
+
+	var ud utils.UserData
+	err = json.Unmarshal([]byte(userDataHeader), &ud)
+	v.NoError(err)
+	v.NotEmpty(ud.UserId, "user_id should not be empty")
+
+	// update email
+	newEmail := fmt.Sprintf("test+updated+%d@example.com", time.Now().UnixNano())
+	updateBody := &bytes.Buffer{}
+	updatePayload := gin.H{
+		"email": newEmail,
+	}
+	_ = json.NewEncoder(updateBody).Encode(updatePayload)
+
+	// - update email in the user endpoint
+	updateReq, err := http.NewRequest(http.MethodPatch, "http://localhost:8182/email", updateBody)
+	v.NoError(err)
+	updateReq.Header.Set("User-Data", userDataHeader)
+	updateResp, err := client.Do(updateReq)
+	v.NoError(err)
+	updateRespBody, err := io.ReadAll(updateResp.Body)
+	v.NoError(err)
+	v.Equal(http.StatusOK, updateResp.StatusCode)
+	v.Contains(string(updateRespBody), "verify to change email")
+
+	// get the link from email in mailhog
+	link = helper.RetrieveLinkChangeTokenFromEmail(newEmail, v.T())
+	fmt.Println(link)
+	// verify new email
+	verifyRequest, err = http.NewRequest(http.MethodGet, link, nil)
+	v.NoError(err)
+	verifyResponse, err = client.Do(verifyRequest)
+	v.NoError(err)
+	verifyBody, err = io.ReadAll(verifyResponse.Body)
+	v.NoError(err)
+	v.Equal(http.StatusOK, verifyResponse.StatusCode)
+	v.Contains(string(verifyBody), "Verification Success")
 }
