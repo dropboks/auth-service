@@ -1,6 +1,7 @@
 package env
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/viper"
@@ -8,15 +9,16 @@ import (
 
 func Load() {
 	env := os.Getenv("ENV")
-	configName := "config"
+	configName := "config.local"
 	configpath := "."
 	switch env {
 	case "production":
-		configName = "config.local"
+		configName = "config"
 	case "test":
 		configName = "config.test"
 		configpath = "../../"
 	}
+	fmt.Println(configName)
 	viper.SetConfigName(configName)
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(configpath)
