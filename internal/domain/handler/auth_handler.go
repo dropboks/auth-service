@@ -115,6 +115,11 @@ func (a *authHandler) ResendVerificationOTP(ctx *gin.Context) {
 		return
 	}
 	if err := a.authService.ResendVerificationOTPService(req.Email); err != nil {
+		if err == dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED || err == dto.Err_UNAUTHORIZED_2FA_DISABLED {
+			res := utils.ReturnResponseError(401, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+			return
+		}
 		code := status.Code(err)
 		message := status.Convert(err).Message()
 		switch code {
