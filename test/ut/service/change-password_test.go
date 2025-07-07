@@ -95,7 +95,14 @@ func (c *ChangePasswordServiceSuite) TestAuthService_ChangePasswordService_Expir
 		Password:        "new-password",
 		ConfirmPassword: "new-password",
 	}
-
+	mockUser := &upb.User{
+		Id:               "user-id-123",
+		Email:            "test@example.com",
+		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
+		Verified:         true,
+		TwoFactorEnabled: true,
+	}
+	c.mockUserClient.On("GetUserByUserId", mock.Anything, mock.Anything, mock.Anything).Return(mockUser, nil)
 	c.mockAuthRepo.On("GetResource", mock.Anything, mock.AnythingOfType("string")).Return("", errors.New("token not found"))
 
 	err := c.authService.ChangePasswordService(userid, resetPasswordToken, req)
@@ -112,6 +119,14 @@ func (c *ChangePasswordServiceSuite) TestAuthService_ChangePasswordService_Inval
 		Password:        "new-password",
 		ConfirmPassword: "new-password",
 	}
+	mockUser := &upb.User{
+		Id:               "user-id-123",
+		Email:            "test@example.com",
+		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
+		Verified:         true,
+		TwoFactorEnabled: true,
+	}
+	c.mockUserClient.On("GetUserByUserId", mock.Anything, mock.Anything, mock.Anything).Return(mockUser, nil)
 
 	c.mockAuthRepo.On("GetResource", mock.Anything, mock.AnythingOfType("string")).Return("valid-reset-password-token", nil)
 
@@ -129,12 +144,9 @@ func (c *ChangePasswordServiceSuite) TestAuthService_ChangePasswordService_Passw
 		ConfirmPassword: "different-new-password",
 	}
 
-	c.mockAuthRepo.On("GetResource", mock.Anything, mock.AnythingOfType("string")).Return(resetPasswordToken, nil)
-
 	err := c.authService.ChangePasswordService(userid, resetPasswordToken, req)
 
 	assert.Error(c.T(), err)
-	c.mockAuthRepo.AssertExpectations(c.T())
 }
 
 func (c *ChangePasswordServiceSuite) TestAuthService_ChangePasswordService_UserNotFound() {
@@ -145,13 +157,11 @@ func (c *ChangePasswordServiceSuite) TestAuthService_ChangePasswordService_UserN
 		ConfirmPassword: "new-password",
 	}
 
-	c.mockAuthRepo.On("GetResource", mock.Anything, mock.AnythingOfType("string")).Return(resetPasswordToken, nil)
 	c.mockUserClient.On("GetUserByUserId", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("user not found"))
 
 	err := c.authService.ChangePasswordService(userid, resetPasswordToken, req)
 
 	assert.Error(c.T(), err)
-	c.mockAuthRepo.AssertExpectations(c.T())
 	c.mockUserClient.AssertExpectations(c.T())
 }
 
