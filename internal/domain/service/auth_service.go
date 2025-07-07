@@ -58,8 +58,20 @@ func New(authRepository repository.AuthRepository, userServiceClient upb.UserSer
 }
 
 func (a *authService) ChangePasswordService(userId string, resetPasswordToken string, req *dto.ChangePasswordRequest) error {
+	if req.Password != req.ConfirmPassword {
+		a.logger.Error().Msg("password and confirm password doesn't match")
+		return dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH
+	}
+
 	ctx := context.Background()
+
+	user, err := a.userServiceClient.GetUserByUserId(ctx, &upb.UserId{UserId: userId})
+	if err != nil {
+		return err
+	}
+
 	key := fmt.Sprintf("resetPasswordToken:%s", userId)
+
 	rToken, err := a.authRepository.GetResource(ctx, key)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("get token error")
@@ -68,14 +80,6 @@ func (a *authService) ChangePasswordService(userId string, resetPasswordToken st
 	if rToken != resetPasswordToken {
 		a.logger.Error().Msg("token is not match")
 		return dto.Err_UNAUTHORIZED_TOKEN_INVALID
-	}
-	if req.Password != req.ConfirmPassword {
-		a.logger.Error().Msg("password and confirm password doesn't match")
-		return dto.Err_BAD_REQUEST_PASSWORD_DOESNT_MATCH
-	}
-	user, err := a.userServiceClient.GetUserByUserId(ctx, &upb.UserId{UserId: userId})
-	if err != nil {
-		return err
 	}
 	hashedPassword, err := _utils.HashPassword(req.Password)
 	if err != nil {
@@ -107,6 +111,10 @@ func (a *authService) ResetPasswordService(email string) error {
 	if err != nil {
 		return err
 	}
+	if !user.GetVerified() {
+		a.logger.Error().Msg("user is not verified")
+		return dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
+	}
 
 	resetPasswordToken, err := a.g.GenerateToken()
 	if err != nil {
@@ -120,7 +128,7 @@ func (a *authService) ResetPasswordService(email string) error {
 		return err
 	}
 
-	link := fmt.Sprintf("%s/%suserid=%s&resetPasswordToken=%s", viper.GetString("app.url"), "auth/change-password?", user.GetId(), resetPasswordToken)
+	link := fmt.Sprintf("%s/%suserid=%s&resetPasswordToken=%s", viper.GetString("app.url"), viper.GetString("app.changepassword_url"), user.GetId(), resetPasswordToken)
 	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.GetId())
 	msg := &_dto.MailNotificationMessage{
 		Receiver: []string{user.Email},
