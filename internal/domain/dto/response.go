@@ -26,6 +26,7 @@ var (
 	Err_UNAUTHORIZED_JWT_INVALID           = errors.New("token is invalid")
 	Err_UNAUTHORIZED_TOKEN_INVALID         = errors.New("token is invalid")
 	Err_UNAUTHORIZED_USER_NOT_VERIFIED     = errors.New("user is not verified")
+	Err_UNAUTHORIZED_2FA_DISABLED          = errors.New("2FA is disabled")
 	Err_UNAUTHORIZED_OTP_INVALID           = errors.New("OTP is invalid")
 
 	Err_NOTFOUND_KEY_NOTFOUND = errors.New("resource is not found")
