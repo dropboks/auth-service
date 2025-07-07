@@ -20,9 +20,7 @@ import (
 	c "github.com/dropboks/auth-service/config/cache"
 	"github.com/dropboks/auth-service/config/env"
 	"github.com/dropboks/auth-service/internal/infrastructure/cache"
-	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
 	"github.com/dropboks/auth-service/test/helper"
-	"github.com/dropboks/proto-user/pkg/upb"
 	"github.com/dropboks/sharedlib/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
@@ -43,8 +41,6 @@ type VerifyEmailITSuite struct {
 	fileServiceContainer         *helper.FileServiceContainer
 	notificationServiceContainer *helper.NotificationServiceContainer
 	mailHogContainer             *helper.MailhogContainer
-
-	userServiceClient upb.UserServiceClient
 }
 
 func (v *VerifyEmailITSuite) SetupSuite() {
@@ -116,9 +112,6 @@ func (v *VerifyEmailITSuite) SetupSuite() {
 	}
 	v.mailHogContainer = mailContainer
 
-	grpcManager := grpc.NewGRPCClientManager()
-	v.userServiceClient = grpc.NewUserServiceConnection(grpcManager)
-
 	container := bootstrap.Run()
 	serverReady := make(chan bool)
 	server := &server.Server{
@@ -148,11 +141,9 @@ func (v *VerifyEmailITSuite) TearDownSuite() {
 	if err := v.fileServiceContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating file service container: %s", err)
 	}
-
 	if err := v.notificationServiceContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating notification service container: %s", err)
 	}
-
 	if err := v.mailHogContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating mailhog container: %s", err)
 	}
@@ -179,8 +170,9 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_Success() {
 
 	v.Equal(http.StatusCreated, registerResponse.StatusCode)
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
+
 	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
-	link := helper.RetrieveDataFromEmail(email, regex, v.T())
+	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
 
 	// verify email
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -229,7 +221,7 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_TokenInvalid() {
 
 	// get the first link
 	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
-	link := helper.RetrieveDataFromEmail(email, regex, v.T())
+	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
 
 	// resend verification
 	reqBody := &bytes.Buffer{}
@@ -280,7 +272,7 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_AlreadyVerified() {
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
 
 	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
-	link := helper.RetrieveDataFromEmail(email, regex, v.T())
+	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
 
 	// verify email
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -323,7 +315,7 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_KeyNotFound() {
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
 
 	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
-	link := helper.RetrieveDataFromEmail(email, regex, v.T())
+	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
 
 	useridRe := regexp.MustCompile(`userid=([^&]+)`)
 	matches := useridRe.FindStringSubmatch(link)
@@ -389,7 +381,7 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_ChangeTokenSuccess() {
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
 
 	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
-	link := helper.RetrieveDataFromEmail(email, regex, v.T())
+	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
 
 	// - verify-email
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -426,7 +418,6 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_ChangeTokenSuccess() {
 	v.Contains(string(byteBody), "Login Success")
 
 	// - verify
-
 	var respData map[string]interface{}
 	err = json.Unmarshal(byteBody, &respData)
 	v.NoError(err)
@@ -476,7 +467,7 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_ChangeTokenSuccess() {
 
 	// get the link from email in mailhog
 	regex = `http://localhost:8181/verify-email\?userid=[^&]+&changeEmailToken=[^"']+`
-	link = helper.RetrieveDataFromEmail(newEmail, regex, v.T())
+	link = helper.RetrieveDataFromEmail(newEmail, regex, "mail", v.T())
 	// verify new email
 	verifyRequest, err = http.NewRequest(http.MethodGet, link, nil)
 	v.NoError(err)
