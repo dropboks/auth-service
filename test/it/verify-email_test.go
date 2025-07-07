@@ -179,8 +179,8 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_Success() {
 
 	v.Equal(http.StatusCreated, registerResponse.StatusCode)
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
-
-	link := helper.RetrieveDataFromEmail(email, v.T())
+	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	link := helper.RetrieveDataFromEmail(email, regex, v.T())
 
 	// verify email
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -228,7 +228,8 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_TokenInvalid() {
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
 
 	// get the first link
-	link := helper.RetrieveDataFromEmail(email, v.T())
+	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	link := helper.RetrieveDataFromEmail(email, regex, v.T())
 
 	// resend verification
 	reqBody := &bytes.Buffer{}
@@ -278,7 +279,8 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_AlreadyVerified() {
 	v.Equal(http.StatusCreated, registerResponse.StatusCode)
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
 
-	link := helper.RetrieveDataFromEmail(email, v.T())
+	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	link := helper.RetrieveDataFromEmail(email, regex, v.T())
 
 	// verify email
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -320,7 +322,8 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_KeyNotFound() {
 	v.Equal(http.StatusCreated, registerResponse.StatusCode)
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
 
-	link := helper.RetrieveDataFromEmail(email, v.T())
+	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	link := helper.RetrieveDataFromEmail(email, regex, v.T())
 
 	useridRe := regexp.MustCompile(`userid=([^&]+)`)
 	matches := useridRe.FindStringSubmatch(link)
@@ -385,7 +388,8 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_ChangeTokenSuccess() {
 	v.Equal(http.StatusCreated, registerResponse.StatusCode)
 	v.Contains(string(registerResponseBody), "Register Success. Check your email for verification.")
 
-	link := helper.RetrieveDataFromEmail(email, v.T())
+	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	link := helper.RetrieveDataFromEmail(email, regex, v.T())
 
 	// - verify-email
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -471,8 +475,8 @@ func (v *VerifyEmailITSuite) TestVerifyEmailIT_ChangeTokenSuccess() {
 	v.Contains(string(updateRespBody), "verify to change email")
 
 	// get the link from email in mailhog
-	link = helper.RetrieveLinkChangeTokenFromEmail(newEmail, v.T())
-	fmt.Println(link)
+	regex = `http://localhost:8181/verify-email\?userid=[^&]+&changeEmailToken=[^"']+`
+	link = helper.RetrieveDataFromEmail(newEmail, regex, v.T())
 	// verify new email
 	verifyRequest, err = http.NewRequest(http.MethodGet, link, nil)
 	v.NoError(err)
