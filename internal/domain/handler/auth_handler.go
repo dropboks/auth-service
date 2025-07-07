@@ -90,7 +90,12 @@ func (a *authHandler) ResetPassword(ctx *gin.Context) {
 		return
 	}
 	if err := a.authService.ResetPasswordService(req.Email); err != nil {
-		a.logger.Error().Err(err).Msg("failed to reset")
+		a.logger.Error().Err(err).Msg("failed to reset password")
+		if err == dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED {
+			res := utils.ReturnResponseError(401, err.Error())
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+			return
+		}
 		code := status.Code(err)
 		message := status.Convert(err).Message()
 		if code == codes.NotFound {
