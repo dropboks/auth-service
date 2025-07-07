@@ -146,6 +146,14 @@ func (a *authService) ResendVerificationOTPService(email string) error {
 		a.logger.Error().Err(err).Msg("error from user_service")
 		return err
 	}
+	if !user.GetVerified() {
+		a.logger.Error().Err(err).Msg("user is not verified")
+		return dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
+	}
+	if !user.GetTwoFactorEnabled() {
+		a.logger.Error().Err(err).Msg("user is not activate 2FA")
+		return dto.Err_UNAUTHORIZED_2FA_DISABLED
+	}
 	otp, err := a.g.GenerateOTP()
 	if err != nil {
 		a.logger.Error().Err(err).Msg("generate OTP error")
@@ -499,7 +507,6 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		return "", dto.Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH
 	}
 	if user.GetTwoFactorEnabled() {
-		a.logger.Debug().Str("userId", user.Id).Msg("Two-factor authentication enabled, generating OTP")
 		otp, err := a.g.GenerateOTP()
 		if err != nil {
 			a.logger.Error().Err(err).Msg("generate OTP error")
