@@ -1,9 +1,9 @@
 package service_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,13 +11,12 @@ import (
 	"os/exec"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/dropboks/auth-service/cmd/bootstrap"
 	"github.com/dropboks/auth-service/cmd/server"
 	"github.com/dropboks/auth-service/config/env"
-	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
 	"github.com/dropboks/auth-service/test/helper"
-	"github.com/dropboks/proto-user/pkg/upb"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -27,13 +26,15 @@ type VerifyITSuite struct {
 	suite.Suite
 	ctx context.Context
 
-	network              *testcontainers.DockerNetwork
-	pgContainer          *helper.PostgresContainer
-	redisContainer       *helper.RedisContainer
-	natsContainer        *helper.NatsContainer
-	userServiceContainer *helper.UserServiceContainer
-
-	userServiceClient upb.UserServiceClient
+	network                      *testcontainers.DockerNetwork
+	pgContainer                  *helper.PostgresContainer
+	redisContainer               *helper.RedisContainer
+	minioContainer               *helper.MinioContainer
+	natsContainer                *helper.NatsContainer
+	userServiceContainer         *helper.UserServiceContainer
+	fileServiceContainer         *helper.FileServiceContainer
+	notificationServiceContainer *helper.NotificationServiceContainer
+	mailHogContainer             *helper.MailhogContainer
 }
 
 func (v *VerifyITSuite) SetupSuite() {
@@ -61,6 +62,13 @@ func (v *VerifyITSuite) SetupSuite() {
 	}
 	v.redisContainer = rContainer
 
+	// spawn minio
+	mContainer, err := helper.StartMinioContainer(v.ctx, v.network.Name)
+	if err != nil {
+		log.Fatalf("failed starting minio container: %s", err)
+	}
+	v.minioContainer = mContainer
+
 	// spawn nats
 	nContainer, err := helper.StartNatsContainer(v.ctx, v.network.Name)
 	if err != nil {
@@ -76,8 +84,26 @@ func (v *VerifyITSuite) SetupSuite() {
 	}
 	v.userServiceContainer = uContainer
 
-	grpcManager := grpc.NewGRPCClientManager()
-	v.userServiceClient = grpc.NewUserServiceConnection(grpcManager)
+	fContainer, err := helper.StartFileServiceContainer(v.ctx, v.network.Name)
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting file service container: %s", err)
+	}
+	v.fileServiceContainer = fContainer
+
+	// spawn notification service
+	noContainer, err := helper.StartNotificationServiceContainer(v.ctx, v.network.Name)
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting notification service container: %s", err)
+	}
+	v.notificationServiceContainer = noContainer
+
+	mailContainer, err := helper.StartMailhogContainer(v.ctx, v.network.Name)
+	if err != nil {
+		log.Fatalf("failed starting mailhog container: %s", err)
+	}
+	v.mailHogContainer = mailContainer
 
 	container := bootstrap.Run()
 	serverReady := make(chan bool)
@@ -95,11 +121,23 @@ func (v *VerifyITSuite) TearDownSuite() {
 	if err := v.redisContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating redis container: %s", err)
 	}
+	if err := v.minioContainer.Terminate(v.ctx); err != nil {
+		log.Fatalf("error terminating minio container: %s", err)
+	}
 	if err := v.natsContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
 	}
 	if err := v.userServiceContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
+	}
+	if err := v.fileServiceContainer.Terminate(v.ctx); err != nil {
+		log.Fatalf("error terminating file service container: %s", err)
+	}
+	if err := v.notificationServiceContainer.Terminate(v.ctx); err != nil {
+		log.Fatalf("error terminating notification service container: %s", err)
+	}
+	if err := v.mailHogContainer.Terminate(v.ctx); err != nil {
+		log.Fatalf("error terminating mailhog container: %s", err)
 	}
 	p, _ := os.FindProcess(syscall.Getpid())
 	_ = p.Signal(syscall.SIGINT)
@@ -110,37 +148,49 @@ func TestVerifyITSuite(t *testing.T) {
 }
 
 func (v *VerifyITSuite) TestVerifyIT_Success() {
-	imageName := "image-name"
-	user := &upb.User{
-		Id:               "user-id-1",
-		FullName:         "test-user",
-		Image:            &imageName,
-		Email:            "test1@example.com",
-		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
-		Verified:         true,
-		TwoFactorEnabled: false,
-	}
-	_, err := v.userServiceClient.CreateUser(v.ctx, user)
-	v.NoError(err)
-	reqBody := &bytes.Buffer{}
-
-	encoder := gin.H{
-		"email":    "test1@example.com",
-		"password": "password123",
-	}
-	_ = json.NewEncoder(reqBody).Encode(encoder)
-
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/login", reqBody)
-	v.NoError(err)
+	// register
+	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+	request := helper.Register(email, v.T())
 
 	client := http.Client{}
-	response, err := client.Do(req)
+	response, err := client.Do(request)
 	v.NoError(err)
 
 	byteBody, err := io.ReadAll(response.Body)
-
 	v.NoError(err)
-	defer response.Body.Close()
+
+	v.Equal(http.StatusCreated, response.StatusCode)
+	v.Contains(string(byteBody), "Register Success. Check your email for verification.")
+	response.Body.Close()
+
+	// verify email
+	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
+
+	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
+	v.NoError(err)
+
+	verifyResponse, err := client.Do(verifyRequest)
+	v.NoError(err)
+
+	verifyBody, err := io.ReadAll(verifyResponse.Body)
+	v.NoError(err)
+
+	v.Equal(http.StatusOK, verifyResponse.StatusCode)
+	v.Contains(string(verifyBody), "Verification Success")
+
+	// login
+	request = helper.Login(email, v.T())
+
+	client = http.Client{}
+	response, err = client.Do(request)
+	v.NoError(err)
+
+	byteBody, err = io.ReadAll(response.Body)
+
+	v.Equal(http.StatusOK, response.StatusCode)
+	v.NoError(err)
+	v.Contains(string(byteBody), "Login Success")
 
 	var respData map[string]interface{}
 	err = json.Unmarshal(byteBody, &respData)
@@ -212,54 +262,71 @@ func (v *VerifyITSuite) TestVerifyIT_InvalidToken() {
 }
 
 func (v *VerifyITSuite) TestVerifyIT_UnmatchTokenWithTokenInTheState() {
-	imageName := "image-name"
-	user := &upb.User{
-		Id:               "user-id-2",
-		FullName:         "test-user2",
-		Image:            &imageName,
-		Email:            "test2@example.com",
-		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
-		Verified:         true,
-		TwoFactorEnabled: false,
-	}
-	_, err := v.userServiceClient.CreateUser(v.ctx, user)
-	v.NoError(err)
-
-	reqBody1 := &bytes.Buffer{}
-	_ = json.NewEncoder(reqBody1).Encode(gin.H{
-		"email":    "test2@example.com",
-		"password": "password123",
-	})
-	req1, err := http.NewRequest(http.MethodPost, "http://localhost:8181/login", reqBody1)
-	v.NoError(err)
+	// register
+	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+	request := helper.Register(email, v.T())
 
 	client := http.Client{}
-	resp1, err := client.Do(req1)
+	response, err := client.Do(request)
 	v.NoError(err)
 
-	defer resp1.Body.Close()
-	body1, err := io.ReadAll(resp1.Body)
+	byteBody, err := io.ReadAll(response.Body)
 	v.NoError(err)
+
+	v.Equal(http.StatusCreated, response.StatusCode)
+	v.Contains(string(byteBody), "Register Success. Check your email for verification.")
+	response.Body.Close()
+
+	// verify email
+	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
+
+	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
+	v.NoError(err)
+
+	verifyResponse, err := client.Do(verifyRequest)
+	v.NoError(err)
+
+	verifyBody, err := io.ReadAll(verifyResponse.Body)
+	v.NoError(err)
+
+	v.Equal(http.StatusOK, verifyResponse.StatusCode)
+	v.Contains(string(verifyBody), "Verification Success")
+
+	// first login
+	request = helper.Login(email, v.T())
+
+	client = http.Client{}
+	response, err = client.Do(request)
+	v.NoError(err)
+
+	byteBody, err = io.ReadAll(response.Body)
+
+	v.Equal(http.StatusOK, response.StatusCode)
+	v.NoError(err)
+	v.Contains(string(byteBody), "Login Success")
 
 	var respData1 map[string]interface{}
-	err = json.Unmarshal(body1, &respData1)
+	err = json.Unmarshal(byteBody, &respData1)
 	v.NoError(err)
 
 	jwt1, ok := respData1["data"].(string)
 	v.True(ok, "expected jwt token in data field")
 
-	reqBody2 := &bytes.Buffer{}
-	_ = json.NewEncoder(reqBody2).Encode(gin.H{
-		"email":    "test2@example.com",
-		"password": "password123",
-	})
-	req2, err := http.NewRequest(http.MethodPost, "http://localhost:8181/login", reqBody2)
+	// second login
+	request = helper.Login(email, v.T())
+
+	client = http.Client{}
+	response, err = client.Do(request)
 	v.NoError(err)
 
-	resp2, err := client.Do(req2)
-	v.NoError(err)
-	defer resp2.Body.Close()
+	byteBody, err = io.ReadAll(response.Body)
 
+	v.Equal(http.StatusOK, response.StatusCode)
+	v.NoError(err)
+	v.Contains(string(byteBody), "Login Success")
+
+	// verify
 	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify", nil)
 	verifyReq.Header.Set("Authorization", "Bearer "+jwt1)
 	v.NoError(err)
@@ -267,7 +334,7 @@ func (v *VerifyITSuite) TestVerifyIT_UnmatchTokenWithTokenInTheState() {
 	verifyResp, err := client.Do(verifyReq)
 	v.NoError(err)
 
-	byteBody, err := io.ReadAll(verifyResp.Body)
+	byteBody, err = io.ReadAll(verifyResp.Body)
 	v.NoError(err)
 
 	v.Equal(http.StatusUnauthorized, verifyResp.StatusCode)

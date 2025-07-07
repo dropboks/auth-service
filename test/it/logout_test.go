@@ -1,9 +1,9 @@
 package service_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,13 +11,12 @@ import (
 	"os/exec"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/dropboks/auth-service/cmd/bootstrap"
 	"github.com/dropboks/auth-service/cmd/server"
 	"github.com/dropboks/auth-service/config/env"
-	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
 	"github.com/dropboks/auth-service/test/helper"
-	"github.com/dropboks/proto-user/pkg/upb"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -27,13 +26,15 @@ type LogoutITSuite struct {
 	suite.Suite
 	ctx context.Context
 
-	network              *testcontainers.DockerNetwork
-	pgContainer          *helper.PostgresContainer
-	redisContainer       *helper.RedisContainer
-	natsContainer        *helper.NatsContainer
-	userServiceContainer *helper.UserServiceContainer
-
-	userServiceClient upb.UserServiceClient
+	network                      *testcontainers.DockerNetwork
+	pgContainer                  *helper.PostgresContainer
+	redisContainer               *helper.RedisContainer
+	minioContainer               *helper.MinioContainer
+	natsContainer                *helper.NatsContainer
+	userServiceContainer         *helper.UserServiceContainer
+	fileServiceContainer         *helper.FileServiceContainer
+	notificationServiceContainer *helper.NotificationServiceContainer
+	mailHogContainer             *helper.MailhogContainer
 }
 
 func (l *LogoutITSuite) SetupSuite() {
@@ -61,6 +62,13 @@ func (l *LogoutITSuite) SetupSuite() {
 	}
 	l.redisContainer = rContainer
 
+	// spawn minio
+	mContainer, err := helper.StartMinioContainer(l.ctx, l.network.Name)
+	if err != nil {
+		log.Fatalf("failed starting minio container: %s", err)
+	}
+	l.minioContainer = mContainer
+
 	// spawn nats
 	nContainer, err := helper.StartNatsContainer(l.ctx, l.network.Name)
 	if err != nil {
@@ -76,8 +84,26 @@ func (l *LogoutITSuite) SetupSuite() {
 	}
 	l.userServiceContainer = uContainer
 
-	grpcManager := grpc.NewGRPCClientManager()
-	l.userServiceClient = grpc.NewUserServiceConnection(grpcManager)
+	fContainer, err := helper.StartFileServiceContainer(l.ctx, l.network.Name)
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting file service container: %s", err)
+	}
+	l.fileServiceContainer = fContainer
+
+	// spawn notification service
+	noContainer, err := helper.StartNotificationServiceContainer(l.ctx, l.network.Name)
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting notification service container: %s", err)
+	}
+	l.notificationServiceContainer = noContainer
+
+	mailContainer, err := helper.StartMailhogContainer(l.ctx, l.network.Name)
+	if err != nil {
+		log.Fatalf("failed starting mailhog container: %s", err)
+	}
+	l.mailHogContainer = mailContainer
 
 	container := bootstrap.Run()
 	serverReady := make(chan bool)
@@ -95,12 +121,25 @@ func (l *LogoutITSuite) TearDownSuite() {
 	if err := l.redisContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating redis container: %s", err)
 	}
+	if err := l.minioContainer.Terminate(l.ctx); err != nil {
+		log.Fatalf("error terminating minio container: %s", err)
+	}
 	if err := l.natsContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
 	}
 	if err := l.userServiceContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
 	}
+	if err := l.fileServiceContainer.Terminate(l.ctx); err != nil {
+		log.Fatalf("error terminating file service container: %s", err)
+	}
+	if err := l.notificationServiceContainer.Terminate(l.ctx); err != nil {
+		log.Fatalf("error terminating notification service container: %s", err)
+	}
+	if err := l.mailHogContainer.Terminate(l.ctx); err != nil {
+		log.Fatalf("error terminating mailhog container: %s", err)
+	}
+
 	p, _ := os.FindProcess(syscall.Getpid())
 	_ = p.Signal(syscall.SIGINT)
 	log.Println("Tear Down integration test suite for LogoutITSuite")
@@ -110,37 +149,49 @@ func TestLogoutITSuite(t *testing.T) {
 }
 
 func (l *LogoutITSuite) TestLogoutIT_Success() {
-	imageName := "image-name"
-	user := &upb.User{
-		Id:               "user-id-1",
-		FullName:         "test-user",
-		Image:            &imageName,
-		Email:            "test1@example.com",
-		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
-		Verified:         true,
-		TwoFactorEnabled: false,
-	}
-	_, err := l.userServiceClient.CreateUser(l.ctx, user)
-	l.NoError(err)
-	reqBody := &bytes.Buffer{}
-
-	encoder := gin.H{
-		"email":    "test1@example.com",
-		"password": "password123",
-	}
-	_ = json.NewEncoder(reqBody).Encode(encoder)
-
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/login", reqBody)
-	l.NoError(err)
+	// register
+	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+	request := helper.Register(email, l.T())
 
 	client := http.Client{}
-	response, err := client.Do(req)
+	response, err := client.Do(request)
 	l.NoError(err)
 
 	byteBody, err := io.ReadAll(response.Body)
-
 	l.NoError(err)
-	defer response.Body.Close()
+
+	l.Equal(http.StatusCreated, response.StatusCode)
+	l.Contains(string(byteBody), "Register Success. Check your email for verification.")
+	response.Body.Close()
+
+	// verify email
+	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	link := helper.RetrieveDataFromEmail(email, regex, "mail", l.T())
+
+	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
+	l.NoError(err)
+
+	verifyResponse, err := client.Do(verifyRequest)
+	l.NoError(err)
+
+	verifyBody, err := io.ReadAll(verifyResponse.Body)
+	l.NoError(err)
+
+	l.Equal(http.StatusOK, verifyResponse.StatusCode)
+	l.Contains(string(verifyBody), "Verification Success")
+
+	// login
+	request = helper.Login(email, l.T())
+
+	client = http.Client{}
+	response, err = client.Do(request)
+	l.NoError(err)
+
+	byteBody, err = io.ReadAll(response.Body)
+
+	l.Equal(http.StatusOK, response.StatusCode)
+	l.NoError(err)
+	l.Contains(string(byteBody), "Login Success")
 
 	var respData map[string]interface{}
 	err = json.Unmarshal(byteBody, &respData)

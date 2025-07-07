@@ -3,6 +3,7 @@ package service_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
@@ -11,13 +12,12 @@ import (
 	"os/exec"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/dropboks/auth-service/cmd/bootstrap"
 	"github.com/dropboks/auth-service/cmd/server"
 	"github.com/dropboks/auth-service/config/env"
-	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
 	"github.com/dropboks/auth-service/test/helper"
-	"github.com/dropboks/proto-user/pkg/upb"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -34,8 +34,6 @@ type RegisterITSuite struct {
 	natsContainer        *helper.NatsContainer
 	userServiceContainer *helper.UserServiceContainer
 	fileServiceContainer *helper.FileServiceContainer
-
-	userServiceClient upb.UserServiceClient
 }
 
 func (r *RegisterITSuite) SetupSuite() {
@@ -93,9 +91,6 @@ func (r *RegisterITSuite) SetupSuite() {
 	}
 	r.fileServiceContainer = fContainer
 
-	grpcManager := grpc.NewGRPCClientManager()
-	r.userServiceClient = grpc.NewUserServiceConnection(grpcManager)
-
 	container := bootstrap.Run()
 	serverReady := make(chan bool)
 	server := &server.Server{
@@ -134,26 +129,8 @@ func TestRegisterITSuite(t *testing.T) {
 }
 
 func (r *RegisterITSuite) TestRegisterIT_Success() {
-	reqBody := &bytes.Buffer{}
-
-	formWriter := multipart.NewWriter(reqBody)
-	_ = formWriter.WriteField("full_name", "test-full-name")
-	_ = formWriter.WriteField("email", "test@example.com")
-	_ = formWriter.WriteField("password", "password123")
-	_ = formWriter.WriteField("confirm_password", "password123")
-
-	fileWriter, _ := formWriter.CreateFormFile("image", "test.jpg")
-	_, err := fileWriter.Write([]byte("fake image data"))
-	r.NoError(err)
-	if err != nil {
-		log.Fatal("failed to create image data")
-	}
-	formWriter.Close()
-
-	request, err := http.NewRequest(http.MethodPost, "http://localhost:8181/register", reqBody)
-	request.Header.Set("Content-Type", formWriter.FormDataContentType())
-	r.NoError(err)
-
+	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+	request := helper.Register(email, r.T())
 	client := http.Client{}
 	response, err := client.Do(request)
 	r.NoError(err)
@@ -193,32 +170,8 @@ func (r *RegisterITSuite) TestRegisterIT_MissingBody() {
 }
 
 func (r *RegisterITSuite) TestRegisterIT_EmailAlreadyExist() {
-	imageName := "image-name"
-	user := &upb.User{
-		Id:               "user-id-1",
-		FullName:         "test-user",
-		Image:            &imageName,
-		Email:            "test1@example.com",
-		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
-		Verified:         true,
-		TwoFactorEnabled: false,
-	}
-	_, err := r.userServiceClient.CreateUser(r.ctx, user)
-	r.NoError(err)
-
-	reqBody := &bytes.Buffer{}
-
-	formWriter := multipart.NewWriter(reqBody)
-	_ = formWriter.WriteField("full_name", "test-user")
-	_ = formWriter.WriteField("email", "test1@example.com")
-	_ = formWriter.WriteField("password", "password123")
-	_ = formWriter.WriteField("confirm_password", "password123")
-
-	formWriter.Close()
-
-	request, err := http.NewRequest(http.MethodPost, "http://localhost:8181/register", reqBody)
-	request.Header.Set("Content-Type", formWriter.FormDataContentType())
-	r.NoError(err)
+	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
+	request := helper.Register(email, r.T())
 
 	client := http.Client{}
 	response, err := client.Do(request)
@@ -227,8 +180,21 @@ func (r *RegisterITSuite) TestRegisterIT_EmailAlreadyExist() {
 	byteBody, err := io.ReadAll(response.Body)
 	r.NoError(err)
 
-	r.Equal(http.StatusConflict, response.StatusCode)
-	r.Contains(string(byteBody), "user with this email exist")
+	r.Equal(http.StatusCreated, response.StatusCode)
+	r.Contains(string(byteBody), "Register Success. Check your email for verification.")
+	response.Body.Close()
+
+	secRequest := helper.Register(email, r.T())
+
+	client = http.Client{}
+	secResponse, err := client.Do(secRequest)
+	r.NoError(err)
+
+	secByteBody, err := io.ReadAll(secResponse.Body)
+	r.NoError(err)
+
+	r.Equal(http.StatusConflict, secResponse.StatusCode)
+	r.Contains(string(secByteBody), "user with this email exist")
 	response.Body.Close()
 }
 
