@@ -50,8 +50,8 @@ github.com/docker/go-connections v0.5.0 h1:USnMq7hx7gwdVZq1L49hLXaFtUdTADjXGp+uj
 github.com/docker/go-connections v0.5.0/go.mod h1:ov60Kzw0kKElRwhNs9UlUHAE/F9Fe6GLaXnqyDdmEXc=
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
-github.com/dropboks/event-bus-client v0.0.0-20250708072232-f464eb8c4f8a h1:i93zDhZ7nLi1vfHXWm7Be1wMtKM+JCwIZhYTxbkHdcg=
-github.com/dropboks/event-bus-client v0.0.0-20250708072232-f464eb8c4f8a/go.mod h1:XtyU7NgSNwDrgTxV2yD80ZssQoBsG80YeqdACesRvjQ=
+github.com/dropboks/event-bus-client v0.0.0-20250708092155-e109e3ad4b52 h1:O1BCGROYbPdPOvCscX9/Ds7fy0rIgXRdDDZqM26c1Pk=
+github.com/dropboks/event-bus-client v0.0.0-20250708092155-e109e3ad4b52/go.mod h1:XtyU7NgSNwDrgTxV2yD80ZssQoBsG80YeqdACesRvjQ=
 github.com/dropboks/proto-event v0.0.0-20250708021719-ce25723e7fdb h1:zFvAz1GZHqFTFC7LAr2xNF+3Hu/hDjKt20iNlvSp3pE=
 github.com/dropboks/proto-event v0.0.0-20250708021719-ce25723e7fdb/go.mod h1:ClgEboMshBbHYgllKyZ0Ym1vOqB4m4/IjxP8j7VDQqo=
 github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf h1:w1OJZ9TkC62+E0tstPQFZqtYh32jnfbHHSYu/Oh7R9s=

@@ -3,7 +3,7 @@ module github.com/dropboks/auth-service
 go 1.24.2
 
 require (
-	github.com/dropboks/event-bus-client v0.0.0-20250708072232-f464eb8c4f8a
+	github.com/dropboks/event-bus-client v0.0.0-20250708092155-e109e3ad4b52
 	github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf
 	github.com/dropboks/proto-user v0.0.0-20250707095407-f3d6a5abdba6
 	github.com/dropboks/sharedlib v0.0.0-20250630083049-8e0644a513aa
