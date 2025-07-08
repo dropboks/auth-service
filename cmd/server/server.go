@@ -12,8 +12,11 @@ import (
 
 	"github.com/dropboks/auth-service/internal/domain/handler"
 	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
+	event "github.com/dropboks/event-bus-client/pkg/event/user"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
@@ -34,10 +37,14 @@ func (s *Server) Run() {
 			redis *redis.Client,
 			nc *nats.Conn,
 			ah handler.AuthHandler,
+			pgx *pgxpool.Pool,
+			ue event.UserEventConsumer,
+			js jetstream.JetStream,
 		) {
 			defer grpcClientManager.CloseAllConnections()
 			defer redis.Close()
 			defer nc.Drain()
+			defer pgx.Close()
 
 			router.Use(gin.Recovery())
 			handler.AuthRoutes(router, ah)
@@ -53,8 +60,11 @@ func (s *Server) Run() {
 				}
 			}()
 
+			// init consumer here
+			go ue.StartConsume()
+
 			if s.ServerReady != nil {
-				for range 50 { // try for up to 5 seconds
+				for range 50 {
 					conn, err := net.DialTimeout("tcp", ":"+viper.GetString("app.http.port"), 100*time.Millisecond)
 					if err == nil {
 						conn.Close()
@@ -66,7 +76,8 @@ func (s *Server) Run() {
 			}
 
 			quit := make(chan os.Signal, 1)
-			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+			signal.Notify(quit, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGTERM)
+
 			<-quit
 			logger.Info().Msg("Shutting down server...")
 
