@@ -5,6 +5,7 @@ import (
 	"github.com/dropboks/auth-service/config/logger"
 	mq "github.com/dropboks/auth-service/config/message-queue"
 	"github.com/dropboks/auth-service/config/router"
+	"github.com/dropboks/auth-service/config/storage"
 	"github.com/dropboks/auth-service/internal/domain/handler"
 	"github.com/dropboks/auth-service/internal/domain/repository"
 	"github.com/dropboks/auth-service/internal/domain/service"
@@ -21,6 +22,9 @@ func BuildContainer() *dig.Container {
 	if err := container.Provide(logger.New); err != nil {
 		panic("Failed to provide logger: " + err.Error())
 	}
+	if err := container.Provide(storage.New); err != nil {
+		panic("Failed to provide database connection: " + err.Error())
+	}
 	// nats client connection
 	if err := container.Provide(mq.New); err != nil {
 		panic("Failed to provide nats connection: " + err.Error())
@@ -33,8 +37,12 @@ func BuildContainer() *dig.Container {
 		panic("Failed to provide jetstream connection: " + err.Error())
 	}
 	// jetstream infrastructure
-	if err := container.Provide(_mq.NewJetstreamInfra); err != nil {
-		panic("Failed to provide jetstream infrastructure: " + err.Error())
+	if err := container.Provide(_mq.NewNatsInfrastructure); err != nil {
+		panic("Failed to provide nats infrastructure: " + err.Error())
+	}
+	// user event consumer
+	if err := container.Provide(_mq.NewUserEventConsumerInfra); err != nil {
+		panic("Failed to provide user event consumer: " + err.Error())
 	}
 	// redis client connection
 	if err := container.Provide(_cache.New); err != nil {
