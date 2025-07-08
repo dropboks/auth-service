@@ -41,12 +41,12 @@ type (
 		userServiceClient upb.UserServiceClient
 		fileServiceClient fpb.FileServiceClient
 		logger            zerolog.Logger
-		js                _mq.JetStreamInfra
+		js                _mq.Nats
 		g                 generators.RandomGenerator
 	}
 )
 
-func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger, js _mq.JetStreamInfra, g generators.RandomGenerator) AuthService {
+func New(authRepository repository.AuthRepository, userServiceClient upb.UserServiceClient, fileServiceClient fpb.FileServiceClient, logger zerolog.Logger, js _mq.Nats, g generators.RandomGenerator) AuthService {
 	return &authService{
 		authRepository:    authRepository,
 		userServiceClient: userServiceClient,
@@ -129,7 +129,7 @@ func (a *authService) ResetPasswordService(email string) error {
 	}
 
 	link := fmt.Sprintf("%s/%suserid=%s&resetPasswordToken=%s", viper.GetString("app.url"), viper.GetString("app.changepassword_url"), user.GetId(), resetPasswordToken)
-	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.GetId())
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.GetId())
 	msg := &_dto.MailNotificationMessage{
 		Receiver: []string{user.Email},
 		MsgType:  "resetPassword",
@@ -173,7 +173,7 @@ func (a *authService) ResendVerificationOTPService(email string) error {
 		return err
 	}
 
-	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.Id)
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.Id)
 	msg := &_dto.MailNotificationMessage{
 		Receiver: []string{user.Email},
 		MsgType:  "OTP",
@@ -249,7 +249,7 @@ func (a *authService) ResendVerificationService(email string) error {
 		return err
 	}
 	link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), viper.GetString("app.verification_url"), user.GetId(), verificationToken)
-	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.GetId())
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.GetId())
 	msg := &_dto.MailNotificationMessage{
 		Receiver: []string{email},
 		MsgType:  "verification",
@@ -472,11 +472,9 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 		a.logger.Error().Err(err).Msg("failed to set verification token")
 		return err
 	}
-
 	go func() {
-
 		link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), viper.GetString("app.verification_url"), userId, verificationToken)
-		subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), userId)
+		subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), userId)
 		msg := &_dto.MailNotificationMessage{
 			Receiver: []string{user.Email},
 			MsgType:  "verification",
@@ -490,6 +488,8 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 		_, err = a.js.Publish(ctx, subject, []byte(marshalledMsg))
 		if err != nil {
 			a.logger.Error().Err(err).Msg("publish notification error")
+		} else {
+			a.logger.Info().Msgf("Published message to subject %s", subject)
 		}
 	}()
 	return nil
@@ -527,7 +527,7 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		}
 
 		go func() {
-			subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.subject.mail"), user.Id)
+			subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.Id)
 			msg := &_dto.MailNotificationMessage{
 				Receiver: []string{user.Email},
 				MsgType:  "OTP",
