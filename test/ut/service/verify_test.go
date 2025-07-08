@@ -18,7 +18,7 @@ type VerifyServiceSuite struct {
 	mockAuthRepo   *mocks.MockAuthRepository
 	mockUserClient *mocks.MockUserServiceClient
 	mockFileClient *mocks.MockFileServiceClient
-	mockJetStream  *mocks.MockJetStreamInfra
+	mockJetStream  *mocks.MockNatsInfra
 	mockGenerator  *mocks.MockRandomGenerator
 }
 
@@ -27,7 +27,7 @@ func (v *VerifyServiceSuite) SetupSuite() {
 	mockAuthRepo := new(mocks.MockAuthRepository)
 	mockUserClient := new(mocks.MockUserServiceClient)
 	mockFileClient := new(mocks.MockFileServiceClient)
-	mockJetStream := new(mocks.MockJetStreamInfra)
+	mockJetStream := new(mocks.MockNatsInfra)
 	mockGenerator := new(mocks.MockRandomGenerator)
 
 	logger := zerolog.Nop()
