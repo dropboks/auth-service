@@ -2,9 +2,9 @@ database:
   host: "localhost"
   user: "user_test"
   password: "password_test"
-  port: "5432"
+  port: "5433"
   name: "testdb"
-  sslmode: false
+  sslmode: "disable"
 
 app:
   name: "test_app_name"
@@ -42,13 +42,24 @@ nats:
   timeout: 10
 
 jetstream:
-  stream: 
-    name: "notification_stream_test"
-    description: "this is notification stream"
-  subject:
-    global: "test_notif.>"
-    mail: "test_notif.email"
-
+  notification:
+    stream: 
+      name: "notification_stream_test"
+      description: "this is notification stream"
+    subject:
+      global: "test_notif.>"
+      mail: "test_notif.email"
+  event:
+    stream: 
+      name: "event_stream_test"
+      description: "this is event bus stream"
+    consumer:
+      user_event:
+        name: "test_auth-user_consumer"
+        subject: "test_event.user.*"
+    subject:
+      global: "test_event.>"
+      event_bus: "test_event"
 server:
   cors:
     allow_origins: "*"
