@@ -1,7 +1,6 @@
 package env
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/viper"
@@ -18,7 +17,6 @@ func Load() {
 		configName = "config.test"
 		configpath = "../../"
 	}
-	fmt.Println(configName)
 	viper.SetConfigName(configName)
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(configpath)
