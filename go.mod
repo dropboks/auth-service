@@ -3,13 +3,15 @@ module github.com/dropboks/auth-service
 go 1.24.2
 
 require (
+	github.com/dropboks/event-bus-client v0.0.0-20250708072232-f464eb8c4f8a
 	github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf
-	github.com/dropboks/proto-user v0.0.0-20250625031838-748bd8c8e9b5
+	github.com/dropboks/proto-user v0.0.0-20250707095407-f3d6a5abdba6
 	github.com/dropboks/sharedlib v0.0.0-20250630083049-8e0644a513aa
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.7.5
 	github.com/nats-io/nats.go v1.43.0
 	github.com/redis/go-redis/v9 v9.11.0
 	github.com/rs/zerolog v1.34.0
@@ -23,9 +25,10 @@ require (
 require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
+	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/bytedance/sonic v1.13.3 // indirect
-	github.com/bytedance/sonic/loader v0.2.4 // indirect
+	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
@@ -40,6 +43,7 @@ require (
 	github.com/docker/docker v28.3.1+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
+	github.com/dropboks/proto-event v0.0.0-20250708021719-ce25723e7fdb // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -54,9 +58,14 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.3.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
+	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
+	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20250317134145-8bc96cf8fc35 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
@@ -106,9 +115,10 @@ require (
 	golang.org/x/arch v0.18.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
