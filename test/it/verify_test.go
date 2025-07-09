@@ -16,7 +16,10 @@ import (
 	"github.com/dropboks/auth-service/cmd/bootstrap"
 	"github.com/dropboks/auth-service/cmd/server"
 	"github.com/dropboks/auth-service/config/env"
+	"github.com/spf13/viper"
+
 	"github.com/dropboks/auth-service/test/helper"
+	_helper "github.com/dropboks/sharedlib/test/helper"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -27,15 +30,15 @@ type VerifyITSuite struct {
 	ctx context.Context
 
 	network                      *testcontainers.DockerNetwork
-	userPgContainer              *helper.PostgresContainer
-	authPgContainer              *helper.PostgresContainer
-	redisContainer               *helper.RedisContainer
-	minioContainer               *helper.MinioContainer
-	natsContainer                *helper.NatsContainer
-	userServiceContainer         *helper.UserServiceContainer
-	fileServiceContainer         *helper.FileServiceContainer
-	notificationServiceContainer *helper.NotificationServiceContainer
-	mailHogContainer             *helper.MailhogContainer
+	userPgContainer              *_helper.PostgresContainer
+	authPgContainer              *_helper.PostgresContainer
+	redisContainer               *_helper.RedisContainer
+	minioContainer               *_helper.MinioContainer
+	natsContainer                *_helper.NatsContainer
+	userServiceContainer         *_helper.UserServiceContainer
+	fileServiceContainer         *_helper.FileServiceContainer
+	notificationServiceContainer *_helper.NotificationServiceContainer
+	mailHogContainer             *_helper.MailhogContainer
 }
 
 func (v *VerifyITSuite) SetupSuite() {
@@ -49,67 +52,65 @@ func (v *VerifyITSuite) SetupSuite() {
 	env.Load()
 
 	// spawn sharedNetwork
-	v.network = helper.StartNetwork(v.ctx)
+	v.network = _helper.StartNetwork(v.ctx)
 
 	// spawn user db
-	userPgContainer, err := helper.StartPostgresContainer(v.ctx, v.network.Name, "user_db", "5432")
+	userPgContainer, err := _helper.StartPostgresContainer(v.ctx, v.network.Name, "user_db", "5432", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	v.userPgContainer = userPgContainer
 
 	// spawn auth db
-	authPgContainer, err := helper.StartPostgresContainer(v.ctx, v.network.Name, "auth_db", "5433")
+	authPgContainer, err := _helper.StartPostgresContainer(v.ctx, v.network.Name, "auth_db", "5433", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	v.authPgContainer = authPgContainer
 
 	// spawn redis
-	rContainer, err := helper.StartRedisContainer(v.ctx, v.network.Name)
+	rContainer, err := _helper.StartRedisContainer(v.ctx, v.network.Name, viper.GetString("container.redis_version"))
 	if err != nil {
 		log.Fatalf("failed starting redis container: %s", err)
 	}
 	v.redisContainer = rContainer
 
-	// spawn minio
-	mContainer, err := helper.StartMinioContainer(v.ctx, v.network.Name)
+	mContainer, err := _helper.StartMinioContainer(v.ctx, v.network.Name, viper.GetString("container.minio_version"))
 	if err != nil {
 		log.Fatalf("failed starting minio container: %s", err)
 	}
 	v.minioContainer = mContainer
 
 	// spawn nats
-	nContainer, err := helper.StartNatsContainer(v.ctx, v.network.Name)
+	nContainer, err := _helper.StartNatsContainer(v.ctx, v.network.Name, viper.GetString("container.nats_version"))
 	if err != nil {
 		log.Fatalf("failed starting minio container: %s", err)
 	}
 	v.natsContainer = nContainer
 
-	// spawn user service
-	uContainer, err := helper.StartUserServiceContainer(v.ctx, v.network.Name)
-	if err != nil {
-		log.Println("make sure the image is exist")
-		log.Fatalf("failed starting user service container: %s", err)
-	}
-	v.userServiceContainer = uContainer
-
-	fContainer, err := helper.StartFileServiceContainer(v.ctx, v.network.Name)
+	fContainer, err := _helper.StartFileServiceContainer(v.ctx, v.network.Name, viper.GetString("container.file_service_version"))
 	if err != nil {
 		log.Println("make sure the image is exist")
 		log.Fatalf("failed starting file service container: %s", err)
 	}
 	v.fileServiceContainer = fContainer
 
-	// spawn notification service
-	noContainer, err := helper.StartNotificationServiceContainer(v.ctx, v.network.Name)
+	// spawn user service
+	uContainer, err := _helper.StartUserServiceContainer(v.ctx, v.network.Name, viper.GetString("container.user_service_version"))
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting user service container: %s", err)
+	}
+	v.userServiceContainer = uContainer
+
+	noContainer, err := _helper.StartNotificationServiceContainer(v.ctx, v.network.Name, viper.GetString("container.notification_service_version"))
 	if err != nil {
 		log.Println("make sure the image is exist")
 		log.Fatalf("failed starting notification service container: %s", err)
 	}
 	v.notificationServiceContainer = noContainer
 
-	mailContainer, err := helper.StartMailhogContainer(v.ctx, v.network.Name)
+	mailContainer, err := _helper.StartMailhogContainer(v.ctx, v.network.Name, viper.GetString("container.mailhog_version"))
 	if err != nil {
 		log.Fatalf("failed starting mailhog container: %s", err)
 	}

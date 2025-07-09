@@ -17,7 +17,10 @@ import (
 	"github.com/dropboks/auth-service/cmd/bootstrap"
 	"github.com/dropboks/auth-service/cmd/server"
 	"github.com/dropboks/auth-service/config/env"
+	"github.com/spf13/viper"
+
 	"github.com/dropboks/auth-service/test/helper"
+	_helper "github.com/dropboks/sharedlib/test/helper"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -28,13 +31,13 @@ type RegisterITSuite struct {
 	ctx context.Context
 
 	network              *testcontainers.DockerNetwork
-	userPgContainer      *helper.PostgresContainer
-	authPgContainer      *helper.PostgresContainer
-	redisContainer       *helper.RedisContainer
-	minioContainer       *helper.MinioContainer
-	natsContainer        *helper.NatsContainer
-	userServiceContainer *helper.UserServiceContainer
-	fileServiceContainer *helper.FileServiceContainer
+	userPgContainer      *_helper.PostgresContainer
+	authPgContainer      *_helper.PostgresContainer
+	redisContainer       *_helper.RedisContainer
+	minioContainer       *_helper.MinioContainer
+	natsContainer        *_helper.NatsContainer
+	userServiceContainer *_helper.UserServiceContainer
+	fileServiceContainer *_helper.FileServiceContainer
 }
 
 func (r *RegisterITSuite) SetupSuite() {
@@ -47,58 +50,56 @@ func (r *RegisterITSuite) SetupSuite() {
 	env.Load()
 
 	// spawn sharedNetwork
-	r.network = helper.StartNetwork(r.ctx)
+	r.network = _helper.StartNetwork(r.ctx)
 
 	// spawn user db
-	userPgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", "5432")
+	userPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", "5432", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	r.userPgContainer = userPgContainer
 
 	// spawn auth db
-	authPgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", "5433")
+	authPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", "5433", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	r.authPgContainer = authPgContainer
 
 	// spawn redis
-	rContainer, err := helper.StartRedisContainer(r.ctx, r.network.Name)
+	rContainer, err := _helper.StartRedisContainer(r.ctx, r.network.Name, viper.GetString("container.redis_version"))
 	if err != nil {
 		log.Fatalf("failed starting redis container: %s", err)
 	}
 	r.redisContainer = rContainer
 
-	// spawn minio
-	mContainer, err := helper.StartMinioContainer(r.ctx, r.network.Name)
+	mContainer, err := _helper.StartMinioContainer(r.ctx, r.network.Name, viper.GetString("container.minio_version"))
 	if err != nil {
 		log.Fatalf("failed starting minio container: %s", err)
 	}
 	r.minioContainer = mContainer
 
 	// spawn nats
-	nContainer, err := helper.StartNatsContainer(r.ctx, r.network.Name)
+	nContainer, err := _helper.StartNatsContainer(r.ctx, r.network.Name, viper.GetString("container.nats_version"))
 	if err != nil {
 		log.Fatalf("failed starting minio container: %s", err)
 	}
 	r.natsContainer = nContainer
 
-	// spawn user service
-	uContainer, err := helper.StartUserServiceContainer(r.ctx, r.network.Name)
-	if err != nil {
-		log.Println("make sure the image is exist")
-		log.Fatalf("failed starting user service container: %s", err)
-	}
-	r.userServiceContainer = uContainer
-
-	// spawn file service
-	fContainer, err := helper.StartFileServiceContainer(r.ctx, r.network.Name)
+	fContainer, err := _helper.StartFileServiceContainer(r.ctx, r.network.Name, viper.GetString("container.file_service_version"))
 	if err != nil {
 		log.Println("make sure the image is exist")
 		log.Fatalf("failed starting file service container: %s", err)
 	}
 	r.fileServiceContainer = fContainer
+
+	// spawn user service
+	uContainer, err := _helper.StartUserServiceContainer(r.ctx, r.network.Name, viper.GetString("container.user_service_version"))
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting user service container: %s", err)
+	}
+	r.userServiceContainer = uContainer
 
 	container := bootstrap.Run()
 	serverReady := make(chan bool)

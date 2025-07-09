@@ -71,3 +71,13 @@ server:
 
 jwt:
   secret_key: "jwt_secret_test"
+
+container:
+  file_service_version: "v0.0.1"
+  user_service_version: "v0.0.1"
+  notification_service_version: "v0.0.1"
+  nats_version: "2.11.6"
+  minio_version: "RELEASE.2025-05-24T17-08-30Z-cpuv1"
+  mailhog_version: "v1.0.1"
+  postgresql_version: "17.5-alpine3.22"
+  redis_version : "7.2"
