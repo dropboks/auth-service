@@ -56,10 +56,10 @@ github.com/dropboks/proto-event v0.0.0-20250708021719-ce25723e7fdb h1:zFvAz1GZHq
 github.com/dropboks/proto-event v0.0.0-20250708021719-ce25723e7fdb/go.mod h1:ClgEboMshBbHYgllKyZ0Ym1vOqB4m4/IjxP8j7VDQqo=
 github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf h1:w1OJZ9TkC62+E0tstPQFZqtYh32jnfbHHSYu/Oh7R9s=
 github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf/go.mod h1:stfWzJh9Wmm3h5WqjQxMlEJFeUzWOlld4sc8HZrvYd4=
-github.com/dropboks/proto-user v0.0.0-20250707095407-f3d6a5abdba6 h1:lloasdyWe6ASytJ/iYZGydDcipbi8G649Ffck4KA2SA=
-github.com/dropboks/proto-user v0.0.0-20250707095407-f3d6a5abdba6/go.mod h1:nX8J9GEC/aT5ch3H0mi4QeCQ+RtFO/6GcKR3182DFqY=
-github.com/dropboks/sharedlib v0.0.0-20250630083049-8e0644a513aa h1:7jXC1f8iF5vu8/Yvvc22fqWwNKaQIYrM8gt/KKEBGmI=
-github.com/dropboks/sharedlib v0.0.0-20250630083049-8e0644a513aa/go.mod h1:6C4Aj5U5aYLtcS0M9fS4NWpM06UXI2lvy2mB5TD9cTo=
+github.com/dropboks/proto-user v0.0.0-20250709010613-66c877f96ac7 h1:sOJuKl07il+0jyk+G8E5rQqrY6yYt27dulmbj1tM7w0=
+github.com/dropboks/proto-user v0.0.0-20250709010613-66c877f96ac7/go.mod h1:Pj6/JS3foqIt7xuA+33mhrYt/4OmUjKS+7Jt0gx8YQw=
+github.com/dropboks/sharedlib v0.0.0-20250709011035-f48c3cae93c9 h1:LU1CbhF+FVDckeggph3AyVqGbLMwQ1VXae+vjyNAay4=
+github.com/dropboks/sharedlib v0.0.0-20250709011035-f48c3cae93c9/go.mod h1:AL0soWlCOfEOfhbyvkH9ojD/eWkjodc3/it8vFGZIo0=
 github.com/ebitengine/purego v0.8.4 h1:CF7LEKg5FFOsASUj0+QwaXf8Ht6TlFxg09+S9wz0omw=
 github.com/ebitengine/purego v0.8.4/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
@@ -182,6 +182,8 @@ github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
 github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
+github.com/pashagolub/pgxmock/v4 v4.8.0 h1:RBtNUZXNG/ZwyOT7sJdSEx9RlAw19sgVPlnmEdlpT08=
+github.com/pashagolub/pgxmock/v4 v4.8.0/go.mod h1:9L57pC193h2aKRHVyiiE817avasIPZnPwPlw3JczWvM=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
 github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
