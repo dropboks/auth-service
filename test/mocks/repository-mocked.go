@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/dropboks/sharedlib/model"
 	m "github.com/stretchr/testify/mock"
 )
 
@@ -24,4 +25,16 @@ func (m *MockAuthRepository) SetResource(ctx context.Context, s1 string, s2 stri
 func (m *MockAuthRepository) RemoveResource(ctx context.Context, s string) error {
 	args := m.Called(ctx, s)
 	return args.Error(0)
+}
+
+func (m *MockAuthRepository) GetUserByUserId(userId string) (*model.User, error) {
+	args := m.Called(userId)
+	user, _ := args.Get(0).(*model.User)
+	return user, args.Error(1)
+}
+
+func (m *MockAuthRepository) GetUserByEmail(email string) (*model.User, error) {
+	args := m.Called(email)
+	user, _ := args.Get(0).(*model.User)
+	return user, args.Error(1)
 }

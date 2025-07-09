@@ -11,13 +11,11 @@ import (
 	"github.com/dropboks/auth-service/test/mocks"
 	"github.com/dropboks/proto-file/pkg/fpb"
 	upb "github.com/dropboks/proto-user/pkg/upb"
+	"github.com/dropboks/sharedlib/model"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type RegisterServiceSuite struct {
@@ -39,7 +37,6 @@ func (r *RegisterServiceSuite) SetupSuite() {
 	mockGenerator := new(mocks.MockRandomGenerator)
 
 	logger := zerolog.Nop()
-	// logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 	r.mockAuthRepo = mockAuthRepo
 	r.mockUserClient = mockUserClient
 	r.mockFileClient = mockFileClient
@@ -89,10 +86,7 @@ func (r *RegisterServiceSuite) TestAuthService_RegisterService_Success() {
 		Sequence: 1,
 	}
 
-	r.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
-		return email.Email == registerReq.Email
-	})).Return(nil, status.Error(codes.NotFound, "user not found"))
-
+	r.mockAuthRepo.On("GetUserByEmail", mock.Anything).Return(nil, dto.Err_NOTFOUND_USER_NOT_FOUND)
 	r.mockFileClient.On("SaveProfileImage", mock.Anything, mock.Anything).Return(&fpb.ImageName{Name: "saved-image-name.jpg"}, nil)
 	r.mockGenerator.On("GenerateUUID").Return("uuid-generated")
 	r.mockUserClient.On("CreateUser", mock.Anything, mock.Anything).Return(&upb.Status{Success: true}, nil)
@@ -102,7 +96,7 @@ func (r *RegisterServiceSuite) TestAuthService_RegisterService_Success() {
 
 	err := r.authService.RegisterService(registerReq)
 
-	assert.NoError(r.T(), err)
+	r.NoError(err)
 	r.mockUserClient.AssertExpectations(r.T())
 	r.mockFileClient.AssertExpectations(r.T())
 	r.mockAuthRepo.AssertExpectations(r.T())
@@ -122,8 +116,7 @@ func (r *RegisterServiceSuite) TestAuthService_RegisterService_PasswordNotMatch(
 	}
 
 	err := r.authService.RegisterService(registerReq)
-
-	assert.Error(r.T(), err)
+	r.Error(err)
 }
 func (r *RegisterServiceSuite) TestAuthService_RegisterService_WrongImageExtension() {
 	imageData := bytes.Repeat([]byte("test"), 1024)
@@ -146,8 +139,7 @@ func (r *RegisterServiceSuite) TestAuthService_RegisterService_WrongImageExtensi
 	}
 
 	err := r.authService.RegisterService(registerReq)
-
-	assert.Error(r.T(), err)
+	r.Error(err)
 }
 func (r *RegisterServiceSuite) TestAuthService_RegisterService_ImageSizeExceeded() {
 	imageData := bytes.Repeat([]byte("test"), 8*1024*1024)
@@ -170,7 +162,7 @@ func (r *RegisterServiceSuite) TestAuthService_RegisterService_ImageSizeExceeded
 	}
 
 	err := r.authService.RegisterService(registerReq)
-	assert.Error(r.T(), err)
+	r.Error(err)
 }
 func (r *RegisterServiceSuite) TestAuthService_RegisterService_EmailAlreadyExist() {
 
@@ -182,19 +174,17 @@ func (r *RegisterServiceSuite) TestAuthService_RegisterService_EmailAlreadyExist
 		ConfirmPassword: "password1234",
 	}
 
-	mockUser := &upb.User{
-		Id:               "user-id-123",
+	mockUser := &model.User{
+		ID:               "user-id-123",
 		Email:            "test@example.com",
 		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
 		Verified:         true,
 		TwoFactorEnabled: false,
 	}
-	r.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
-		return email.Email == registerReq.Email
-	})).Return(mockUser, nil)
+	r.mockAuthRepo.On("GetUserByEmail", mock.Anything).Return(mockUser, nil)
 
 	err := r.authService.RegisterService(registerReq)
-	assert.Error(r.T(), err)
+	r.Error(err)
 
-	r.mockUserClient.AssertExpectations(r.T())
+	r.mockAuthRepo.AssertExpectations(r.T())
 }

@@ -28,7 +28,8 @@ type RegisterITSuite struct {
 	ctx context.Context
 
 	network              *testcontainers.DockerNetwork
-	pgContainer          *helper.PostgresContainer
+	userPgContainer      *helper.PostgresContainer
+	authPgContainer      *helper.PostgresContainer
 	redisContainer       *helper.RedisContainer
 	minioContainer       *helper.MinioContainer
 	natsContainer        *helper.NatsContainer
@@ -37,7 +38,8 @@ type RegisterITSuite struct {
 }
 
 func (r *RegisterITSuite) SetupSuite() {
-	exec.Command("docker", "rm", "-f", "db").Run()
+	exec.Command("docker", "rm", "-f", "user_db").Run()
+	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for RegisterITSuite")
 	r.ctx = context.Background()
 	gin.SetMode(gin.TestMode)
@@ -47,12 +49,19 @@ func (r *RegisterITSuite) SetupSuite() {
 	// spawn sharedNetwork
 	r.network = helper.StartNetwork(r.ctx)
 
-	// spawn posgresql
-	pgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name)
+	// spawn user db
+	userPgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", "5432")
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
-	r.pgContainer = pgContainer
+	r.userPgContainer = userPgContainer
+
+	// spawn auth db
+	authPgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", "5433")
+	if err != nil {
+		log.Fatalf("failed starting postgres container: %s", err)
+	}
+	r.authPgContainer = authPgContainer
 
 	// spawn redis
 	rContainer, err := helper.StartRedisContainer(r.ctx, r.network.Name)
@@ -101,8 +110,11 @@ func (r *RegisterITSuite) SetupSuite() {
 	<-serverReady
 }
 func (r *RegisterITSuite) TearDownSuite() {
-	if err := r.pgContainer.Terminate(r.ctx); err != nil {
-		log.Fatalf("error terminating postgres container: %s", err)
+	if err := r.userPgContainer.Terminate(r.ctx); err != nil {
+		log.Fatalf("error terminating user postgres container: %s", err)
+	}
+	if err := r.authPgContainer.Terminate(r.ctx); err != nil {
+		log.Fatalf("error terminating auth postgres container: %s", err)
 	}
 	if err := r.redisContainer.Terminate(r.ctx); err != nil {
 		log.Fatalf("error terminating redis container: %s", err)
@@ -183,6 +195,8 @@ func (r *RegisterITSuite) TestRegisterIT_EmailAlreadyExist() {
 	r.Equal(http.StatusCreated, response.StatusCode)
 	r.Contains(string(byteBody), "Register Success. Check your email for verification.")
 	response.Body.Close()
+
+	time.Sleep(time.Second)
 
 	secRequest := helper.Register(email, r.T())
 

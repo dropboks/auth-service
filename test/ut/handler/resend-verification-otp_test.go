@@ -12,8 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type ResendVerificationOTPHandlerSuite struct {
@@ -101,7 +99,7 @@ func (r *ResendVerificationOTPHandlerSuite) TestAuthHandler_ResendVerificationOT
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = request
 
-	r.mockAuthService.On("ResendVerificationOTPService", input.Email).Return(status.Error(codes.NotFound, "user not found"))
+	r.mockAuthService.On("ResendVerificationOTPService", input.Email).Return(dto.Err_NOTFOUND_USER_NOT_FOUND)
 	r.authHandler.ResendVerificationOTP(ctx)
 
 	r.Equal(404, w.Code)

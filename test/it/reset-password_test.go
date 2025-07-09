@@ -28,7 +28,8 @@ type ResetPasswordITSuite struct {
 	ctx context.Context
 
 	network                      *testcontainers.DockerNetwork
-	pgContainer                  *helper.PostgresContainer
+	userPgContainer              *helper.PostgresContainer
+	authPgContainer              *helper.PostgresContainer
 	redisContainer               *helper.RedisContainer
 	minioContainer               *helper.MinioContainer
 	natsContainer                *helper.NatsContainer
@@ -39,7 +40,9 @@ type ResetPasswordITSuite struct {
 }
 
 func (r *ResetPasswordITSuite) SetupSuite() {
-	exec.Command("docker", "rm", "-f", "db").Run()
+	exec.Command("docker", "rm", "-f", "user_db").Run()
+	exec.Command("docker", "rm", "-f", "auth_db").Run()
+
 	log.Println("Setting up integration test suite for ResetPasswordITSuite")
 	r.ctx = context.Background()
 	gin.SetMode(gin.TestMode)
@@ -49,13 +52,19 @@ func (r *ResetPasswordITSuite) SetupSuite() {
 	// spawn sharedNetwork
 	r.network = helper.StartNetwork(r.ctx)
 
-	// spawn posgresql
-	pgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name)
+	// spawn user db
+	userPgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", "5432")
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
-	r.pgContainer = pgContainer
+	r.userPgContainer = userPgContainer
 
+	// spawn auth db
+	authPgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", "5433")
+	if err != nil {
+		log.Fatalf("failed starting postgres container: %s", err)
+	}
+	r.authPgContainer = authPgContainer
 	// spawn redis
 	rContainer, err := helper.StartRedisContainer(r.ctx, r.network.Name)
 	if err != nil {
@@ -114,8 +123,11 @@ func (r *ResetPasswordITSuite) SetupSuite() {
 	<-serverReady
 }
 func (r *ResetPasswordITSuite) TearDownSuite() {
-	if err := r.pgContainer.Terminate(r.ctx); err != nil {
-		log.Fatalf("error terminating postgres container: %s", err)
+	if err := r.userPgContainer.Terminate(r.ctx); err != nil {
+		log.Fatalf("error terminating user postgres container: %s", err)
+	}
+	if err := r.authPgContainer.Terminate(r.ctx); err != nil {
+		log.Fatalf("error terminating auth postgres container: %s", err)
 	}
 	if err := r.redisContainer.Terminate(r.ctx); err != nil {
 		log.Fatalf("error terminating redis container: %s", err)
@@ -162,6 +174,8 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_Success() {
 	r.Contains(string(byteBody), "Register Success. Check your email for verification.")
 	response.Body.Close()
 
+	time.Sleep(time.Second) //give a time for auth_db update the user
+
 	// verify email
 	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", r.T())
@@ -178,8 +192,9 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_Success() {
 	r.Equal(http.StatusOK, verifyResponse.StatusCode)
 	r.Contains(string(verifyBody), "Verification Success")
 
-	// reset password
+	time.Sleep(time.Second) //give a time for auth_db update the user
 
+	// reset password
 	body := &bytes.Buffer{}
 
 	encoder := gin.H{
@@ -240,6 +255,8 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_NotVerified() {
 	r.Equal(http.StatusCreated, response.StatusCode)
 	r.Contains(string(byteBody), "Register Success. Check your email for verification.")
 	response.Body.Close()
+
+	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// reset password
 	body := &bytes.Buffer{}

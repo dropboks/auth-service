@@ -7,10 +7,9 @@ import (
 	"github.com/dropboks/auth-service/internal/domain/dto"
 	"github.com/dropboks/auth-service/internal/domain/service"
 	"github.com/dropboks/auth-service/test/mocks"
-	upb "github.com/dropboks/proto-user/pkg/upb"
+	"github.com/dropboks/sharedlib/model"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
@@ -21,7 +20,6 @@ type LoginServiceSuite struct {
 	suite.Suite
 	authService    service.AuthService
 	mockAuthRepo   *mocks.MockAuthRepository
-	mockUserClient *mocks.MockUserServiceClient
 	mockFileClient *mocks.MockFileServiceClient
 	mockJetStream  *mocks.MockNatsInfra
 	mockGenerator  *mocks.MockRandomGenerator
@@ -37,7 +35,6 @@ func (l *LoginServiceSuite) SetupSuite() {
 
 	logger := zerolog.Nop()
 	l.mockAuthRepo = mockAuthRepo
-	l.mockUserClient = mockUserClient
 	l.mockFileClient = mockFileClient
 	l.mockJetStream = mockJetStream
 	l.mockGenerator = mockGenerator
@@ -46,11 +43,9 @@ func (l *LoginServiceSuite) SetupSuite() {
 
 func (l *LoginServiceSuite) SetupTest() {
 	l.mockAuthRepo.ExpectedCalls = nil
-	l.mockUserClient.ExpectedCalls = nil
 	l.mockFileClient.ExpectedCalls = nil
 	l.mockJetStream.ExpectedCalls = nil
 	l.mockAuthRepo.Calls = nil
-	l.mockUserClient.Calls = nil
 	l.mockFileClient.Calls = nil
 	l.mockJetStream.Calls = nil
 }
@@ -66,24 +61,21 @@ func (l *LoginServiceSuite) TestAuthService_LoginService_Success() {
 		Password: "password123",
 	}
 
-	mockUser := &upb.User{
-		Id:               "user-id-123",
+	mockUser := &model.User{
+		ID:               "user-id-123",
 		Email:            "test@example.com",
 		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
 		Verified:         true,
 		TwoFactorEnabled: false,
 	}
 
-	l.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
-		return email.Email == loginReq.Email
-	})).Return(mockUser, nil)
-	l.mockAuthRepo.On("SetResource", mock.Anything, "session:user-id-123", mock.AnythingOfType("string"), mock.Anything).Return(nil)
+	l.mockAuthRepo.On("GetUserByEmail", mock.Anything).Return(mockUser, nil)
+	l.mockAuthRepo.On("SetResource", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(nil)
 
 	token, err := l.authService.LoginService(loginReq)
 
-	assert.NoError(l.T(), err)
-	assert.NotEmpty(l.T(), token)
-	l.mockUserClient.AssertExpectations(l.T())
+	l.NoError(err)
+	l.NotEmpty(token)
 	l.mockAuthRepo.AssertExpectations(l.T())
 }
 
@@ -94,15 +86,13 @@ func (l *LoginServiceSuite) TestAuthService_LoginService_UserNotFound() {
 		Password: "password123",
 	}
 
-	l.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
-		return email.Email == loginReq.Email
-	})).Return(nil, status.Error(codes.NotFound, "user not found"))
+	l.mockAuthRepo.On("GetUserByEmail", mock.Anything).Return(nil, status.Error(codes.NotFound, "user not found"))
 
 	token, err := l.authService.LoginService(loginReq)
 
-	assert.Error(l.T(), err)
-	assert.Empty(l.T(), token)
-	l.mockUserClient.AssertExpectations(l.T())
+	l.Error(err)
+	l.Empty(token)
+	l.mockAuthRepo.AssertExpectations(l.T())
 }
 
 func (l *LoginServiceSuite) TestAuthService_LoginService_NotVerified() {
@@ -111,23 +101,21 @@ func (l *LoginServiceSuite) TestAuthService_LoginService_NotVerified() {
 		Password: "password123",
 	}
 
-	mockUser := &upb.User{
-		Id:               "user-id-123",
+	mockUser := &model.User{
+		ID:               "user-id-123",
 		Email:            "notverified@example.com",
 		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
 		Verified:         false,
 		TwoFactorEnabled: false,
 	}
 
-	l.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
-		return email.Email == loginReq.Email
-	})).Return(mockUser, nil)
+	l.mockAuthRepo.On("GetUserByEmail", mock.Anything).Return(mockUser, nil)
 
 	token, err := l.authService.LoginService(loginReq)
 
-	assert.Error(l.T(), err)
-	assert.Empty(l.T(), token)
-	l.mockUserClient.AssertExpectations(l.T())
+	l.Error(err)
+	l.Empty(token)
+	l.mockAuthRepo.AssertExpectations(l.T())
 }
 
 func (l *LoginServiceSuite) TestAuthService_LoginService_WrongPassword() {
@@ -136,23 +124,21 @@ func (l *LoginServiceSuite) TestAuthService_LoginService_WrongPassword() {
 		Password: "password123",
 	}
 
-	mockUser := &upb.User{
-		Id:               "user-id-123",
+	mockUser := &model.User{
+		ID:               "user-id-123",
 		Email:            "test@example.com",
 		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb",
 		Verified:         false,
 		TwoFactorEnabled: false,
 	}
 
-	l.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
-		return email.Email == loginReq.Email
-	})).Return(mockUser, nil)
+	l.mockAuthRepo.On("GetUserByEmail", mock.Anything).Return(mockUser, nil)
 
 	token, err := l.authService.LoginService(loginReq)
 
-	assert.Error(l.T(), err)
-	assert.Empty(l.T(), token)
-	l.mockUserClient.AssertExpectations(l.T())
+	l.Error(err)
+	l.Empty(token)
+	l.mockAuthRepo.AssertExpectations(l.T())
 }
 
 func (l *LoginServiceSuite) TestAuthService_LoginService_WithTwoFactor() {
@@ -161,8 +147,8 @@ func (l *LoginServiceSuite) TestAuthService_LoginService_WithTwoFactor() {
 		Password: "password123",
 	}
 
-	mockUser := &upb.User{
-		Id:               "user-id-123",
+	mockUser := &model.User{
+		ID:               "user-id-123",
 		Email:            "test@example.com",
 		Password:         "$2a$10$Nwjs8PdFOCnjbRM3x/2WAuEtqOSrm6wHByYaw0ZDp5mV7e560dIb6",
 		Verified:         true,
@@ -174,9 +160,7 @@ func (l *LoginServiceSuite) TestAuthService_LoginService_WithTwoFactor() {
 		Sequence: 1,
 	}
 
-	l.mockUserClient.On("GetUserByEmail", mock.Anything, mock.MatchedBy(func(email *upb.Email) bool {
-		return email.Email == loginReq.Email
-	})).Return(mockUser, nil)
+	l.mockAuthRepo.On("GetUserByEmail", mock.Anything).Return(mockUser, nil)
 	l.mockGenerator.On("GenerateOTP").Return("123456", nil)
 
 	l.mockAuthRepo.On("SetResource", mock.Anything, "OTP:user-id-123", mock.AnythingOfType("string"), mock.Anything).Return(nil)
@@ -184,9 +168,9 @@ func (l *LoginServiceSuite) TestAuthService_LoginService_WithTwoFactor() {
 
 	token, err := l.authService.LoginService(loginReq)
 
-	assert.NoError(l.T(), err)
-	assert.Empty(l.T(), token)
-	l.mockUserClient.AssertExpectations(l.T())
+	l.NoError(err)
+	l.Empty(token)
+	l.mockAuthRepo.AssertExpectations(l.T())
 	l.mockAuthRepo.AssertExpectations(l.T())
 
 	time.Sleep(100 * time.Millisecond)

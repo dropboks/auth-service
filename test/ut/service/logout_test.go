@@ -6,7 +6,6 @@ import (
 	"github.com/dropboks/auth-service/internal/domain/service"
 	"github.com/dropboks/auth-service/test/mocks"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -30,7 +29,6 @@ func (l *LogoutServiceSuite) SetupSuite() {
 	mockGenerator := new(mocks.MockRandomGenerator)
 
 	logger := zerolog.Nop()
-	// logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 	l.mockAuthRepo = mockAuthRepo
 	l.mockUserClient = mockUserClient
 	l.mockFileClient = mockFileClient
@@ -63,14 +61,13 @@ func (l *LogoutServiceSuite) TestAuthService_LogoutService_Success() {
 
 	err := l.authService.LogoutService(jwt)
 
-	assert.NoError(l.T(), err)
-
+	l.NoError(err)
 	l.mockAuthRepo.AssertExpectations(l.T())
 }
 func (l *LogoutServiceSuite) TestAuthService_LogoutService_TokenInvalid() {
 	jwt := "access-token"
 
 	err := l.authService.LogoutService(jwt)
+	l.Error(err)
 
-	assert.Error(l.T(), err)
 }

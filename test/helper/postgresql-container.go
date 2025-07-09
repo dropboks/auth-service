@@ -19,11 +19,12 @@ type PostgresContainer struct {
 	DBName    string
 }
 
-func StartPostgresContainer(ctx context.Context, sharedNetwork string) (*PostgresContainer, error) {
+func StartPostgresContainer(ctx context.Context, sharedNetwork, name, port string) (*PostgresContainer, error) {
+	ports := fmt.Sprintf("%s:5432/tcp", port)
 	req := testcontainers.ContainerRequest{
-		Name:         "db",
+		Name:         name,
 		Image:        "postgres:17.5-alpine3.22",
-		ExposedPorts: []string{"5432:5432/tcp"},
+		ExposedPorts: []string{ports},
 		Env: map[string]string{
 			"POSTGRES_DB":       viper.GetString("database.name"),
 			"POSTGRES_USER":     viper.GetString("database.user"),

@@ -12,8 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type ResetPasswordHandlerSuite struct {
@@ -101,7 +99,7 @@ func (r *ResetPasswordHandlerSuite) TestAuthHandler_ResetPasswordHandler_UserNot
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = request
 
-	r.mockAuthService.On("ResetPasswordService", input.Email).Return(status.Error(codes.NotFound, "user not found"))
+	r.mockAuthService.On("ResetPasswordService", input.Email).Return(dto.Err_NOTFOUND_USER_NOT_FOUND)
 	r.authHandler.ResetPassword(ctx)
 
 	r.Equal(404, w.Code)

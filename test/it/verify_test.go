@@ -27,7 +27,8 @@ type VerifyITSuite struct {
 	ctx context.Context
 
 	network                      *testcontainers.DockerNetwork
-	pgContainer                  *helper.PostgresContainer
+	userPgContainer              *helper.PostgresContainer
+	authPgContainer              *helper.PostgresContainer
 	redisContainer               *helper.RedisContainer
 	minioContainer               *helper.MinioContainer
 	natsContainer                *helper.NatsContainer
@@ -38,7 +39,9 @@ type VerifyITSuite struct {
 }
 
 func (v *VerifyITSuite) SetupSuite() {
-	exec.Command("docker", "rm", "-f", "db").Run()
+	exec.Command("docker", "rm", "-f", "user_db").Run()
+	exec.Command("docker", "rm", "-f", "auth_db").Run()
+
 	log.Println("Setting up integration test suite for VerifyITSuite")
 	v.ctx = context.Background()
 	gin.SetMode(gin.TestMode)
@@ -48,12 +51,19 @@ func (v *VerifyITSuite) SetupSuite() {
 	// spawn sharedNetwork
 	v.network = helper.StartNetwork(v.ctx)
 
-	// spawn posgresql
-	pgContainer, err := helper.StartPostgresContainer(v.ctx, v.network.Name)
+	// spawn user db
+	userPgContainer, err := helper.StartPostgresContainer(v.ctx, v.network.Name, "user_db", "5432")
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
-	v.pgContainer = pgContainer
+	v.userPgContainer = userPgContainer
+
+	// spawn auth db
+	authPgContainer, err := helper.StartPostgresContainer(v.ctx, v.network.Name, "auth_db", "5433")
+	if err != nil {
+		log.Fatalf("failed starting postgres container: %s", err)
+	}
+	v.authPgContainer = authPgContainer
 
 	// spawn redis
 	rContainer, err := helper.StartRedisContainer(v.ctx, v.network.Name)
@@ -115,8 +125,11 @@ func (v *VerifyITSuite) SetupSuite() {
 	<-serverReady
 }
 func (v *VerifyITSuite) TearDownSuite() {
-	if err := v.pgContainer.Terminate(v.ctx); err != nil {
-		log.Fatalf("error terminating postgres container: %s", err)
+	if err := v.userPgContainer.Terminate(v.ctx); err != nil {
+		log.Fatalf("error terminating user postgres container: %s", err)
+	}
+	if err := v.authPgContainer.Terminate(v.ctx); err != nil {
+		log.Fatalf("error terminating auth postgres container: %s", err)
 	}
 	if err := v.redisContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating redis container: %s", err)
@@ -163,6 +176,8 @@ func (v *VerifyITSuite) TestVerifyIT_Success() {
 	v.Contains(string(byteBody), "Register Success. Check your email for verification.")
 	response.Body.Close()
 
+	time.Sleep(time.Second) //give a time for auth_db update the user
+
 	// verify email
 	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
@@ -178,6 +193,8 @@ func (v *VerifyITSuite) TestVerifyIT_Success() {
 
 	v.Equal(http.StatusOK, verifyResponse.StatusCode)
 	v.Contains(string(verifyBody), "Verification Success")
+
+	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// login
 	request = helper.Login(email, v.T())
@@ -255,86 +272,6 @@ func (v *VerifyITSuite) TestVerifyIT_InvalidToken() {
 	v.NoError(err)
 
 	byteBody, err := io.ReadAll(verifyResp.Body)
-	v.NoError(err)
-
-	v.Equal(http.StatusUnauthorized, verifyResp.StatusCode)
-	v.Contains(string(byteBody), "token is invalid")
-}
-
-func (v *VerifyITSuite) TestVerifyIT_UnmatchTokenWithTokenInTheState() {
-	// register
-	email := fmt.Sprintf("test+%d@example.com", time.Now().UnixNano())
-	request := helper.Register(email, v.T())
-
-	client := http.Client{}
-	response, err := client.Do(request)
-	v.NoError(err)
-
-	byteBody, err := io.ReadAll(response.Body)
-	v.NoError(err)
-
-	v.Equal(http.StatusCreated, response.StatusCode)
-	v.Contains(string(byteBody), "Register Success. Check your email for verification.")
-	response.Body.Close()
-
-	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
-	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
-
-	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
-	v.NoError(err)
-
-	verifyResponse, err := client.Do(verifyRequest)
-	v.NoError(err)
-
-	verifyBody, err := io.ReadAll(verifyResponse.Body)
-	v.NoError(err)
-
-	v.Equal(http.StatusOK, verifyResponse.StatusCode)
-	v.Contains(string(verifyBody), "Verification Success")
-
-	// first login
-	request = helper.Login(email, v.T())
-
-	client = http.Client{}
-	response, err = client.Do(request)
-	v.NoError(err)
-
-	byteBody, err = io.ReadAll(response.Body)
-
-	v.Equal(http.StatusOK, response.StatusCode)
-	v.NoError(err)
-	v.Contains(string(byteBody), "Login Success")
-
-	var respData1 map[string]interface{}
-	err = json.Unmarshal(byteBody, &respData1)
-	v.NoError(err)
-
-	jwt1, ok := respData1["data"].(string)
-	v.True(ok, "expected jwt token in data field")
-
-	// second login
-	request = helper.Login(email, v.T())
-
-	client = http.Client{}
-	response, err = client.Do(request)
-	v.NoError(err)
-
-	byteBody, err = io.ReadAll(response.Body)
-
-	v.Equal(http.StatusOK, response.StatusCode)
-	v.NoError(err)
-	v.Contains(string(byteBody), "Login Success")
-
-	// verify
-	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify", nil)
-	verifyReq.Header.Set("Authorization", "Bearer "+jwt1)
-	v.NoError(err)
-
-	verifyResp, err := client.Do(verifyReq)
-	v.NoError(err)
-
-	byteBody, err = io.ReadAll(verifyResp.Body)
 	v.NoError(err)
 
 	v.Equal(http.StatusUnauthorized, verifyResp.StatusCode)

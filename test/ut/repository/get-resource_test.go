@@ -6,9 +6,9 @@ import (
 
 	"github.com/dropboks/auth-service/internal/domain/repository"
 	"github.com/dropboks/auth-service/test/mocks"
+	"github.com/pashagolub/pgxmock/v4"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
@@ -23,8 +23,10 @@ func (s *GetResourceRepositorySuite) SetupSuite() {
 
 	logger := zerolog.Nop()
 	redisClient := new(mocks.MockRedisCache)
+	pgxMock, err := pgxmock.NewPool()
+	s.NoError(err)
 	s.mockRedisClient = redisClient
-	s.authRepository = repository.New(redisClient, logger)
+	s.authRepository = repository.New(redisClient, pgxMock, logger)
 }
 
 func (s *GetResourceRepositorySuite) SetupTest() {
@@ -44,8 +46,8 @@ func (s *GetResourceRepositorySuite) TestAuthRepository_GetResource_Success() {
 
 	val, err := s.authRepository.GetResource(ctx, key)
 
-	assert.NotEmpty(s.T(), val)
-	assert.NoError(s.T(), err)
+	s.NoError(err)
+	s.NotEmpty(val)
 
 	s.mockRedisClient.AssertExpectations(s.T())
 }
@@ -58,8 +60,7 @@ func (s *GetResourceRepositorySuite) TestAuthRepository_GetResource_NotFound() {
 
 	val, err := s.authRepository.GetResource(ctx, key)
 
-	assert.Empty(s.T(), val)
-	assert.Error(s.T(), err)
-
+	s.Error(err)
+	s.Empty(val)
 	s.mockRedisClient.AssertExpectations(s.T())
 }

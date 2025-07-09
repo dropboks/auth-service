@@ -28,7 +28,8 @@ type ResendVerificationEmailITSuite struct {
 	ctx context.Context
 
 	network                      *testcontainers.DockerNetwork
-	pgContainer                  *helper.PostgresContainer
+	userPgContainer              *helper.PostgresContainer
+	authPgContainer              *helper.PostgresContainer
 	redisContainer               *helper.RedisContainer
 	minioContainer               *helper.MinioContainer
 	natsContainer                *helper.NatsContainer
@@ -39,7 +40,8 @@ type ResendVerificationEmailITSuite struct {
 }
 
 func (r *ResendVerificationEmailITSuite) SetupSuite() {
-	exec.Command("docker", "rm", "-f", "db").Run()
+	exec.Command("docker", "rm", "-f", "user_db").Run()
+	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for ResendVerificationEmailITSuite")
 	r.ctx = context.Background()
 	gin.SetMode(gin.TestMode)
@@ -49,12 +51,19 @@ func (r *ResendVerificationEmailITSuite) SetupSuite() {
 	// spawn sharedNetwork
 	r.network = helper.StartNetwork(r.ctx)
 
-	// spawn posgresql
-	pgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name)
+	// spawn user db
+	userPgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", "5432")
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
-	r.pgContainer = pgContainer
+	r.userPgContainer = userPgContainer
+
+	// spawn auth db
+	authPgContainer, err := helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", "5433")
+	if err != nil {
+		log.Fatalf("failed starting postgres container: %s", err)
+	}
+	r.authPgContainer = authPgContainer
 
 	// spawn redis
 	rContainer, err := helper.StartRedisContainer(r.ctx, r.network.Name)
@@ -114,8 +123,11 @@ func (r *ResendVerificationEmailITSuite) SetupSuite() {
 	<-serverReady
 }
 func (r *ResendVerificationEmailITSuite) TearDownSuite() {
-	if err := r.pgContainer.Terminate(r.ctx); err != nil {
-		log.Fatalf("error terminating postgres container: %s", err)
+	if err := r.userPgContainer.Terminate(r.ctx); err != nil {
+		log.Fatalf("error terminating user postgres container: %s", err)
+	}
+	if err := r.authPgContainer.Terminate(r.ctx); err != nil {
+		log.Fatalf("error terminating auth postgres container: %s", err)
 	}
 	if err := r.redisContainer.Terminate(r.ctx); err != nil {
 		log.Fatalf("error terminating redis container: %s", err)
@@ -163,6 +175,8 @@ func (r *ResendVerificationEmailITSuite) TestResendVerificationEmailIT_Success()
 	r.Equal(http.StatusCreated, response.StatusCode)
 	r.Contains(string(byteBody), "Register Success. Check your email for verification.")
 	response.Body.Close()
+
+	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// resend
 	reqBody := &bytes.Buffer{}
@@ -232,12 +246,14 @@ func (r *ResendVerificationEmailITSuite) TestResendVerificationEmailIT_AlreadyVe
 	r.Contains(string(byteBody), "Register Success. Check your email for verification.")
 	response.Body.Close()
 
-	// verify
+	time.Sleep(time.Second) //give a time for auth_db update the user
+
+	// verify email
 
 	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", r.T())
 	r.NotEmpty(link)
-	// verify email
+
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
 	r.NoError(err)
 
@@ -249,6 +265,8 @@ func (r *ResendVerificationEmailITSuite) TestResendVerificationEmailIT_AlreadyVe
 
 	r.Equal(http.StatusOK, verifyResponse.StatusCode)
 	r.Contains(string(verifyBody), "Verification Success")
+
+	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// resend
 	reqBody = &bytes.Buffer{}

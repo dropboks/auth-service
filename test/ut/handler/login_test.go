@@ -12,8 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type LoginHandlerSuite struct {
@@ -185,7 +183,7 @@ func (l *LoginHandlerSuite) TestAuthHandler_LoginHandler_NotFound() {
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = request
 
-	l.mockAuthService.On("LoginService", input).Return("", status.Error(codes.NotFound, "user not found"))
+	l.mockAuthService.On("LoginService", input).Return("", dto.Err_NOTFOUND_USER_NOT_FOUND)
 	l.authHandler.Login(ctx)
 
 	l.Equal(404, w.Code)
