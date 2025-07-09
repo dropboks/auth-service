@@ -19,8 +19,6 @@ import (
 	_utils "github.com/dropboks/sharedlib/utils"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type (
@@ -64,12 +62,10 @@ func (a *authService) ChangePasswordService(userId string, resetPasswordToken st
 	}
 
 	ctx := context.Background()
-
-	user, err := a.userServiceClient.GetUserByUserId(ctx, &upb.UserId{UserId: userId})
+	user, err := a.authRepository.GetUserByUserId(userId)
 	if err != nil {
 		return err
 	}
-
 	key := fmt.Sprintf("resetPasswordToken:%s", userId)
 
 	rToken, err := a.authRepository.GetResource(ctx, key)
@@ -88,12 +84,12 @@ func (a *authService) ChangePasswordService(userId string, resetPasswordToken st
 
 	us := &upb.User{
 		Id:               userId,
-		FullName:         user.GetFullName(),
-		Image:            _utils.StringPtr(user.GetImage()),
-		Email:            user.GetEmail(),
+		FullName:         user.FullName,
+		Image:            user.Image,
+		Email:            user.Email,
 		Password:         hashedPassword,
-		Verified:         user.GetVerified(),
-		TwoFactorEnabled: user.GetTwoFactorEnabled(),
+		Verified:         user.Verified,
+		TwoFactorEnabled: user.TwoFactorEnabled,
 	}
 	_, err = a.userServiceClient.UpdateUser(ctx, us)
 	if err != nil {
@@ -107,11 +103,11 @@ func (a *authService) ChangePasswordService(userId string, resetPasswordToken st
 
 func (a *authService) ResetPasswordService(email string) error {
 	ctx := context.Background()
-	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
+	user, err := a.authRepository.GetUserByEmail(email)
 	if err != nil {
 		return err
 	}
-	if !user.GetVerified() {
+	if !user.Verified {
 		a.logger.Error().Msg("user is not verified")
 		return dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
 	}
@@ -122,14 +118,14 @@ func (a *authService) ResetPasswordService(email string) error {
 		return dto.Err_INTERNAL_GENERATE_TOKEN
 	}
 
-	key := fmt.Sprintf("resetPasswordToken:%s", user.GetId())
+	key := fmt.Sprintf("resetPasswordToken:%s", user.ID)
 	if err := a.authRepository.SetResource(ctx, key, resetPasswordToken, 1*time.Hour); err != nil {
 		a.logger.Error().Err(err).Msg("failed to set reset password token")
 		return err
 	}
 
-	link := fmt.Sprintf("%s/%suserid=%s&resetPasswordToken=%s", viper.GetString("app.url"), viper.GetString("app.changepassword_url"), user.GetId(), resetPasswordToken)
-	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.GetId())
+	link := fmt.Sprintf("%s/%suserid=%s&resetPasswordToken=%s", viper.GetString("app.url"), viper.GetString("app.changepassword_url"), user.ID, resetPasswordToken)
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.ID)
 	msg := &_dto.MailNotificationMessage{
 		Receiver: []string{user.Email},
 		MsgType:  "resetPassword",
@@ -149,16 +145,16 @@ func (a *authService) ResetPasswordService(email string) error {
 
 func (a *authService) ResendVerificationOTPService(email string) error {
 	ctx := context.Background()
-	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
+	user, err := a.authRepository.GetUserByEmail(email)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error from user_service")
 		return err
 	}
-	if !user.GetVerified() {
+	if !user.Verified {
 		a.logger.Error().Err(err).Msg("user is not verified")
 		return dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
 	}
-	if !user.GetTwoFactorEnabled() {
+	if !user.TwoFactorEnabled {
 		a.logger.Error().Err(err).Msg("user is not activate 2FA")
 		return dto.Err_UNAUTHORIZED_2FA_DISABLED
 	}
@@ -167,13 +163,13 @@ func (a *authService) ResendVerificationOTPService(email string) error {
 		a.logger.Error().Err(err).Msg("generate OTP error")
 		return dto.Err_INTERNAL_GENERATE_OTP
 	}
-	key := fmt.Sprintf("OTP:%s", user.GetId())
+	key := fmt.Sprintf("OTP:%s", user.ID)
 	if err := a.authRepository.SetResource(ctx, key, otp, 2*time.Minute); err != nil {
 		a.logger.Error().Err(err).Msg("failed to set OTP")
 		return err
 	}
 
-	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.Id)
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.ID)
 	msg := &_dto.MailNotificationMessage{
 		Receiver: []string{user.Email},
 		MsgType:  "OTP",
@@ -194,12 +190,12 @@ func (a *authService) ResendVerificationOTPService(email string) error {
 
 func (a *authService) VerifyOTPService(otp, email string) (string, error) {
 	ctx := context.Background()
-	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
+	user, err := a.authRepository.GetUserByEmail(email)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error from user_service")
 		return "", err
 	}
-	key := fmt.Sprintf("OTP:%s", user.GetId())
+	key := fmt.Sprintf("OTP:%s", user.ID)
 	rOTP, err := a.authRepository.GetResource(ctx, key)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error get otp from Redis")
@@ -215,12 +211,12 @@ func (a *authService) VerifyOTPService(otp, email string) (string, error) {
 		return "", err
 	}
 
-	token, err := jwt.GenerateToken(user.Id, 1*time.Hour)
+	token, claims, err := jwt.GenerateToken(user.ID, 1*time.Hour)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("error JWT Signing")
 		return "", dto.Err_INTENAL_JWT_SIGNING
 	}
-	sessionKey := "session:" + user.GetId()
+	sessionKey := "session:" + claims.ID
 	if err := a.authRepository.SetResource(ctx, sessionKey, token, 1*time.Hour); err != nil {
 		a.logger.Error().Err(err).Msg("error saving token to Redis")
 		return "", err
@@ -230,11 +226,11 @@ func (a *authService) VerifyOTPService(otp, email string) (string, error) {
 
 func (a *authService) ResendVerificationService(email string) error {
 	ctx := context.Background()
-	user, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{Email: email})
+	user, err := a.authRepository.GetUserByEmail(email)
 	if err != nil {
 		return err
 	}
-	if user.GetVerified() {
+	if user.Verified {
 		a.logger.Error().Msg("user already verified")
 		return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
 	}
@@ -243,13 +239,13 @@ func (a *authService) ResendVerificationService(email string) error {
 		a.logger.Error().Err(err).Msg("error generate verification token")
 		return dto.Err_INTERNAL_GENERATE_TOKEN
 	}
-	key := fmt.Sprintf("verificationToken:%s", user.GetId())
+	key := fmt.Sprintf("verificationToken:%s", user.ID)
 	if err := a.authRepository.SetResource(ctx, key, verificationToken, 30*time.Minute); err != nil {
 		a.logger.Error().Err(err).Msg("failed to set verification token")
 		return err
 	}
-	link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), viper.GetString("app.verification_url"), user.GetId(), verificationToken)
-	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.GetId())
+	link := fmt.Sprintf("%s/%suserid=%s&token=%s", viper.GetString("app.url"), viper.GetString("app.verification_url"), user.ID, verificationToken)
+	subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.ID)
 	msg := &_dto.MailNotificationMessage{
 		Receiver: []string{email},
 		MsgType:  "verification",
@@ -270,7 +266,7 @@ func (a *authService) ResendVerificationService(email string) error {
 
 func (a *authService) VerifyEmailService(userId, token, changeToken string) error {
 	ctx := context.Background()
-	user, err := a.userServiceClient.GetUserByUserId(ctx, &upb.UserId{UserId: userId})
+	user, err := a.authRepository.GetUserByUserId(userId)
 	if err != nil {
 		return err
 	}
@@ -294,13 +290,13 @@ func (a *authService) VerifyEmailService(userId, token, changeToken string) erro
 			return err
 		}
 		updatedUser = &upb.User{
-			Id:               user.GetId(),
-			FullName:         user.GetFullName(),
-			Image:            _utils.StringPtr(user.GetImage()),
+			Id:               user.ID,
+			FullName:         user.FullName,
+			Image:            user.Image,
 			Email:            newEmail,
-			Password:         user.GetPassword(),
-			Verified:         user.GetVerified(),
-			TwoFactorEnabled: user.GetTwoFactorEnabled(),
+			Password:         user.Password,
+			Verified:         user.Verified,
+			TwoFactorEnabled: user.TwoFactorEnabled,
 		}
 		_, err = a.userServiceClient.UpdateUser(ctx, updatedUser)
 		if err != nil {
@@ -318,7 +314,7 @@ func (a *authService) VerifyEmailService(userId, token, changeToken string) erro
 			return err
 		}
 	} else {
-		if user.GetVerified() {
+		if user.Verified {
 			a.logger.Error().Msg("user already verified")
 			return dto.Err_CONFLICT_USER_ALREADY_VERIFIED
 		}
@@ -334,11 +330,11 @@ func (a *authService) VerifyEmailService(userId, token, changeToken string) erro
 		}
 
 		updatedUser = &upb.User{
-			Id:               user.GetId(),
-			FullName:         user.GetFullName(),
-			Image:            _utils.StringPtr(user.GetImage()),
-			Email:            user.GetEmail(),
-			Password:         user.GetPassword(),
+			Id:               user.ID,
+			FullName:         user.FullName,
+			Image:            user.Image,
+			Email:            user.Email,
+			Password:         user.Password,
 			Verified:         true,
 			TwoFactorEnabled: false,
 		}
@@ -363,8 +359,7 @@ func (a *authService) VerifyService(token string) (string, error) {
 		a.logger.Error().Err(err).Msg("invalid jwt")
 		return "", err
 	}
-
-	key := "session:" + claims.UserId
+	key := "session:" + claims.ID
 	rToken, err := a.authRepository.GetResource(c, key)
 	if err != nil {
 		return "", err
@@ -383,7 +378,7 @@ func (a *authService) LogoutService(token string) error {
 		a.logger.Error().Err(err).Msg("invalid jwt")
 		return err
 	}
-	key := "session:" + claims.UserId
+	key := "session:" + claims.ID
 	err = a.authRepository.RemoveResource(c, key)
 	if err != nil {
 		return err
@@ -406,12 +401,9 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 		}
 	}
 	ctx := context.Background()
-	exist, err := a.userServiceClient.GetUserByEmail(ctx, &upb.Email{
-		Email: req.Email,
-	})
+	exist, err := a.authRepository.GetUserByEmail(req.Email)
 	if err != nil {
-		code := status.Code(err)
-		if code != codes.NotFound {
+		if err != dto.Err_NOTFOUND_USER_NOT_FOUND {
 			a.logger.Error().Err(err).Msg("Error Query Get User By Email")
 			return err
 		}
@@ -497,37 +489,35 @@ func (a *authService) RegisterService(req dto.RegisterRequest) error {
 
 func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 	c := context.Background()
-	user, err := a.userServiceClient.GetUserByEmail(c, &upb.Email{
-		Email: req.Email,
-	})
+	user, err := a.authRepository.GetUserByEmail(req.Email)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error Query Get User By Email")
 		return "", err
 	}
-	if !user.GetVerified() {
-		a.logger.Error().Msgf("user not verified :%s", user.GetEmail())
+	if !user.Verified {
+		a.logger.Error().Msgf("user not verified :%s", user.Email)
 		return "", dto.Err_UNAUTHORIZED_USER_NOT_VERIFIED
 	}
 
-	ok := _utils.HashPasswordCompare(req.Password, user.GetPassword())
+	ok := _utils.HashPasswordCompare(req.Password, user.Password)
 	if !ok {
 		a.logger.Error().Err(err).Msg("Password doesn't match")
 		return "", dto.Err_UNAUTHORIZED_PASSWORD_DOESNT_MATCH
 	}
-	if user.GetTwoFactorEnabled() {
+	if user.TwoFactorEnabled {
 		otp, err := a.g.GenerateOTP()
 		if err != nil {
 			a.logger.Error().Err(err).Msg("generate OTP error")
 			return "", dto.Err_INTERNAL_GENERATE_OTP
 		}
-		key := fmt.Sprintf("OTP:%s", user.Id)
+		key := fmt.Sprintf("OTP:%s", user.ID)
 		if err := a.authRepository.SetResource(c, key, otp, 2*time.Minute); err != nil {
 			a.logger.Error().Err(err).Msg("failed to set OTP")
 			return "", err
 		}
 
 		go func() {
-			subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.Id)
+			subject := fmt.Sprintf("%s.%s", viper.GetString("jetstream.notification.subject.mail"), user.ID)
 			msg := &_dto.MailNotificationMessage{
 				Receiver: []string{user.Email},
 				MsgType:  "OTP",
@@ -546,12 +536,12 @@ func (a *authService) LoginService(req dto.LoginRequest) (string, error) {
 		return "", nil
 	}
 
-	token, err := jwt.GenerateToken(user.Id, 1*time.Hour)
+	token, claim, err := jwt.GenerateToken(user.ID, 1*time.Hour)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Error JWT Signing")
 		return "", dto.Err_INTENAL_JWT_SIGNING
 	}
-	sessionKey := "session:" + user.GetId()
+	sessionKey := "session:" + claim.ID
 	if err := a.authRepository.SetResource(c, sessionKey, token, 1*time.Hour); err != nil {
 		a.logger.Error().Err(err).Msg("Error saving token to Redis")
 		return "", err
