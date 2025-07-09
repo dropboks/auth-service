@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func GenerateToken(userId string, timeDuration time.Duration) (string, error) {
+func GenerateToken(userId string, timeDuration time.Duration) (string, *Claims, error) {
 	jwtKey := []byte(viper.GetString("jwt.secret_key"))
 	var expirationTime *jwt.NumericDate
 	if timeDuration > 0 {
@@ -26,7 +26,11 @@ func GenerateToken(userId string, timeDuration time.Duration) (string, error) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtKey)
+	signed, err := token.SignedString(jwtKey)
+	if err != nil {
+		return "", nil, err
+	}
+	return signed, claims, nil
 }
 
 func ValidateJWT(tokenStr string) (*Claims, error) {
