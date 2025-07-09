@@ -10,6 +10,7 @@ import (
 	"github.com/dropboks/auth-service/internal/domain/repository"
 	"github.com/dropboks/auth-service/internal/domain/service"
 	cache "github.com/dropboks/auth-service/internal/infrastructure/cache"
+	"github.com/dropboks/auth-service/internal/infrastructure/db"
 	"github.com/dropboks/auth-service/internal/infrastructure/grpc"
 	_mq "github.com/dropboks/auth-service/internal/infrastructure/message-queue"
 	"github.com/dropboks/auth-service/pkg/generators"
@@ -22,7 +23,12 @@ func BuildContainer() *dig.Container {
 	if err := container.Provide(logger.New); err != nil {
 		panic("Failed to provide logger: " + err.Error())
 	}
+	// db connection
 	if err := container.Provide(storage.New); err != nil {
+		panic("Failed to provide database connection: " + err.Error())
+	}
+	// querier
+	if err := container.Provide(db.NewQuerier); err != nil {
 		panic("Failed to provide database connection: " + err.Error())
 	}
 	// nats client connection
