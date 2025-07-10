@@ -9,15 +9,10 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/dropboks/auth-service/cmd/bootstrap"
-	"github.com/dropboks/auth-service/cmd/server"
-	"github.com/dropboks/auth-service/config/env"
 	"github.com/dropboks/auth-service/pkg/generators"
 	"github.com/spf13/viper"
 
@@ -39,6 +34,7 @@ type VerifyOTPITSuite struct {
 	redisContainer               *_helper.RedisContainer
 	minioContainer               *_helper.MinioContainer
 	natsContainer                *_helper.NatsContainer
+	authContainer                *_helper.AuthServiceContainer
 	userServiceContainer         *_helper.UserServiceContainer
 	fileServiceContainer         *_helper.FileServiceContainer
 	notificationServiceContainer *_helper.NotificationServiceContainer
@@ -51,22 +47,26 @@ func (v *VerifyOTPITSuite) SetupSuite() {
 
 	log.Println("Setting up integration test suite for VerifyOTPITSuite")
 	v.ctx = context.Background()
-	gin.SetMode(gin.TestMode)
-	os.Setenv("ENV", "test")
-	env.Load()
+
+	viper.SetConfigName("config.test")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("../../")
+	if err := viper.ReadInConfig(); err != nil {
+		panic("failed to read config")
+	}
 
 	// spawn sharedNetwork
 	v.network = _helper.StartNetwork(v.ctx)
 
 	// spawn user db
-	userPgContainer, err := _helper.StartPostgresContainer(v.ctx, v.network.Name, "user_db", "5432", viper.GetString("container.postgresql_version"))
+	userPgContainer, err := _helper.StartPostgresContainer(v.ctx, v.network.Name, "user_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	v.userPgContainer = userPgContainer
 
 	// spawn auth db
-	authPgContainer, err := _helper.StartPostgresContainer(v.ctx, v.network.Name, "auth_db", "5433", viper.GetString("container.postgresql_version"))
+	authPgContainer, err := _helper.StartPostgresContainer(v.ctx, v.network.Name, "auth_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
@@ -99,6 +99,13 @@ func (v *VerifyOTPITSuite) SetupSuite() {
 	}
 	v.fileServiceContainer = fContainer
 
+	aContainer, err := _helper.StartAuthServiceContainer(v.ctx, v.network.Name, viper.GetString("container.auth_service_version"))
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting auth service container: %s", err)
+	}
+	v.authContainer = aContainer
+
 	// spawn user service
 	uContainer, err := _helper.StartUserServiceContainer(v.ctx, v.network.Name, viper.GetString("container.user_service_version"))
 	if err != nil {
@@ -120,14 +127,6 @@ func (v *VerifyOTPITSuite) SetupSuite() {
 	}
 	v.mailHogContainer = mailContainer
 
-	container := bootstrap.Run()
-	serverReady := make(chan bool)
-	server := &server.Server{
-		Container:   container,
-		ServerReady: serverReady,
-	}
-	go server.Run()
-	<-serverReady
 }
 func (v *VerifyOTPITSuite) TearDownSuite() {
 	if err := v.userPgContainer.Terminate(v.ctx); err != nil {
@@ -145,6 +144,9 @@ func (v *VerifyOTPITSuite) TearDownSuite() {
 	if err := v.natsContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
 	}
+	if err := v.authContainer.Terminate(v.ctx); err != nil {
+		log.Fatalf("error terminating auth service container: %s", err)
+	}
 	if err := v.userServiceContainer.Terminate(v.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
 	}
@@ -158,8 +160,6 @@ func (v *VerifyOTPITSuite) TearDownSuite() {
 		log.Fatalf("error terminating mailhog container: %s", err)
 	}
 
-	p, _ := os.FindProcess(syscall.Getpid())
-	_ = p.Signal(syscall.SIGINT)
 	log.Println("Tear Down integration test suite for VerifyOTPITSuite")
 }
 func TestVerifyOTPITSuite(t *testing.T) {
@@ -185,7 +185,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_Success() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -223,7 +223,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_Success() {
 	v.True(ok, "expected jwt token in data field")
 
 	// verify token
-	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify", nil)
+	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify", nil)
 	v.NoError(err)
 	verifyReq.Header.Set("Authorization", "Bearer "+jwt)
 
@@ -248,7 +248,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_Success() {
 	_ = formWriter.WriteField("two_factor_enabled", "true")
 	formWriter.Close()
 
-	request, err = http.NewRequest(http.MethodPatch, "http://localhost:8182/", reqBody)
+	request, err = http.NewRequest(http.MethodPatch, "http://localhost:8082/", reqBody)
 	request.Header.Set("Content-Type", formWriter.FormDataContentType())
 	request.Header.Set("User-Data", userDataHeader)
 
@@ -293,7 +293,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_Success() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify-otp", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify-otp", reqBody)
 	v.NoError(err)
 
 	client = http.Client{}
@@ -317,7 +317,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_MissingBody() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify-otp", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify-otp", reqBody)
 	v.NoError(err)
 
 	client := http.Client{}
@@ -350,7 +350,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_InvalidOTP() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", v.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -388,7 +388,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_InvalidOTP() {
 	v.True(ok, "expected jwt token in data field")
 
 	// verify token
-	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify", nil)
+	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify", nil)
 	v.NoError(err)
 	verifyReq.Header.Set("Authorization", "Bearer "+jwt)
 
@@ -413,7 +413,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_InvalidOTP() {
 	_ = formWriter.WriteField("two_factor_enabled", "true")
 	formWriter.Close()
 
-	request, err = http.NewRequest(http.MethodPatch, "http://localhost:8182/", reqBody)
+	request, err = http.NewRequest(http.MethodPatch, "http://localhost:8082/", reqBody)
 	request.Header.Set("Content-Type", formWriter.FormDataContentType())
 	request.Header.Set("User-Data", userDataHeader)
 
@@ -459,7 +459,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_InvalidOTP() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify-otp", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify-otp", reqBody)
 	v.NoError(err)
 
 	client = http.Client{}
@@ -501,7 +501,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_KeyNotFound() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify-otp", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify-otp", reqBody)
 	v.NoError(err)
 
 	client = http.Client{}
@@ -528,7 +528,7 @@ func (v *VerifyOTPITSuite) TestVerifyOTPIT_UserNotFound() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify-otp", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify-otp", reqBody)
 	v.NoError(err)
 
 	client := http.Client{}

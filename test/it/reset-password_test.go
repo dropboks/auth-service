@@ -8,15 +8,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/dropboks/auth-service/cmd/bootstrap"
-	"github.com/dropboks/auth-service/cmd/server"
-	"github.com/dropboks/auth-service/config/env"
 	"github.com/spf13/viper"
 
 	"github.com/dropboks/auth-service/test/helper"
@@ -36,6 +31,7 @@ type ResetPasswordITSuite struct {
 	redisContainer               *_helper.RedisContainer
 	minioContainer               *_helper.MinioContainer
 	natsContainer                *_helper.NatsContainer
+	authContainer                *_helper.AuthServiceContainer
 	userServiceContainer         *_helper.UserServiceContainer
 	fileServiceContainer         *_helper.FileServiceContainer
 	notificationServiceContainer *_helper.NotificationServiceContainer
@@ -48,22 +44,26 @@ func (r *ResetPasswordITSuite) SetupSuite() {
 
 	log.Println("Setting up integration test suite for ResetPasswordITSuite")
 	r.ctx = context.Background()
-	gin.SetMode(gin.TestMode)
-	os.Setenv("ENV", "test")
-	env.Load()
+
+	viper.SetConfigName("config.test")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("../../")
+	if err := viper.ReadInConfig(); err != nil {
+		panic("failed to read config")
+	}
 
 	// spawn sharedNetwork
 	r.network = _helper.StartNetwork(r.ctx)
 
 	// spawn user db
-	userPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", "5432", viper.GetString("container.postgresql_version"))
+	userPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	r.userPgContainer = userPgContainer
 
 	// spawn auth db
-	authPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", "5433", viper.GetString("container.postgresql_version"))
+	authPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
@@ -88,6 +88,13 @@ func (r *ResetPasswordITSuite) SetupSuite() {
 		log.Fatalf("failed starting minio container: %s", err)
 	}
 	r.natsContainer = nContainer
+
+	aContainer, err := _helper.StartAuthServiceContainer(r.ctx, r.network.Name, viper.GetString("container.auth_service_version"))
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting auth service container: %s", err)
+	}
+	r.authContainer = aContainer
 
 	fContainer, err := _helper.StartFileServiceContainer(r.ctx, r.network.Name, viper.GetString("container.file_service_version"))
 	if err != nil {
@@ -117,14 +124,6 @@ func (r *ResetPasswordITSuite) SetupSuite() {
 	}
 	r.mailHogContainer = mailContainer
 
-	container := bootstrap.Run()
-	serverReady := make(chan bool)
-	server := &server.Server{
-		Container:   container,
-		ServerReady: serverReady,
-	}
-	go server.Run()
-	<-serverReady
 }
 func (r *ResetPasswordITSuite) TearDownSuite() {
 	if err := r.userPgContainer.Terminate(r.ctx); err != nil {
@@ -142,6 +141,9 @@ func (r *ResetPasswordITSuite) TearDownSuite() {
 	if err := r.natsContainer.Terminate(r.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
 	}
+	if err := r.authContainer.Terminate(r.ctx); err != nil {
+		log.Fatalf("error terminating auth service container: %s", err)
+	}
 	if err := r.userServiceContainer.Terminate(r.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
 	}
@@ -155,8 +157,6 @@ func (r *ResetPasswordITSuite) TearDownSuite() {
 		log.Fatalf("error terminating mailhog container: %s", err)
 	}
 
-	p, _ := os.FindProcess(syscall.Getpid())
-	_ = p.Signal(syscall.SIGINT)
 	log.Println("Tear Down integration test suite for ResetPasswordITSuite")
 }
 func TestResetPasswordITSuite(t *testing.T) {
@@ -181,7 +181,7 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_Success() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", r.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -206,7 +206,7 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_Success() {
 	}
 	_ = json.NewEncoder(body).Encode(encoder)
 
-	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8181/reset-password", body)
+	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8081/reset-password", body)
 	r.NoError(err)
 
 	resetResponse, err := client.Do(resetRequest)
@@ -219,7 +219,7 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_Success() {
 	r.Contains(string(resetBody), "Reset password email has been sent")
 
 	// check email
-	regex = `http://localhost:8181/change-password\?userid=[^&]+&resetPasswordToken=[^"']+`
+	regex = `http://localhost:8081/change-password\?userid=[^&]+&resetPasswordToken=[^"']+`
 	resetLink := helper.RetrieveDataFromEmail(email, regex, "mail", r.T())
 	r.NotEmpty(resetLink)
 }
@@ -230,7 +230,7 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_MissinBody() {
 	encoder := gin.H{}
 	_ = json.NewEncoder(body).Encode(encoder)
 
-	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8181/reset-password", body)
+	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8081/reset-password", body)
 	r.NoError(err)
 
 	client := http.Client{}
@@ -270,7 +270,7 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_NotVerified() {
 	}
 	_ = json.NewEncoder(body).Encode(encoder)
 
-	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8181/reset-password", body)
+	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8081/reset-password", body)
 	r.NoError(err)
 
 	resetResponse, err := client.Do(resetRequest)
@@ -293,7 +293,7 @@ func (r *ResetPasswordITSuite) TestResetPasswordIT_NotFound() {
 	}
 	_ = json.NewEncoder(body).Encode(encoder)
 
-	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8181/reset-password", body)
+	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8081/reset-password", body)
 	r.NoError(err)
 
 	client := http.Client{}

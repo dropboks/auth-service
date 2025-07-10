@@ -9,15 +9,10 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/dropboks/auth-service/cmd/bootstrap"
-	"github.com/dropboks/auth-service/cmd/server"
-	"github.com/dropboks/auth-service/config/env"
 	"github.com/spf13/viper"
 
 	"github.com/dropboks/auth-service/test/helper"
@@ -38,6 +33,7 @@ type LoginITSuite struct {
 	redisContainer               *_helper.RedisContainer
 	minioContainer               *_helper.MinioContainer
 	natsContainer                *_helper.NatsContainer
+	authContainer                *_helper.AuthServiceContainer
 	userServiceContainer         *_helper.UserServiceContainer
 	fileServiceContainer         *_helper.FileServiceContainer
 	notificationServiceContainer *_helper.NotificationServiceContainer
@@ -50,22 +46,25 @@ func (l *LoginITSuite) SetupSuite() {
 	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for LoginITSuite")
 	l.ctx = context.Background()
-	gin.SetMode(gin.TestMode)
-	os.Setenv("ENV", "test")
-	env.Load()
 
+	viper.SetConfigName("config.test")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("../../")
+	if err := viper.ReadInConfig(); err != nil {
+		panic("failed to read config")
+	}
 	// spawn sharedNetwork
 	l.network = _helper.StartNetwork(l.ctx)
 
 	// spawn user db
-	userPgContainer, err := _helper.StartPostgresContainer(l.ctx, l.network.Name, "user_db", "5432", viper.GetString("container.postgresql_version"))
+	userPgContainer, err := _helper.StartPostgresContainer(l.ctx, l.network.Name, "user_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	l.userPgContainer = userPgContainer
 
 	// spawn auth db
-	authPgContainer, err := _helper.StartPostgresContainer(l.ctx, l.network.Name, "auth_db", "5433", viper.GetString("container.postgresql_version"))
+	authPgContainer, err := _helper.StartPostgresContainer(l.ctx, l.network.Name, "auth_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
@@ -90,6 +89,13 @@ func (l *LoginITSuite) SetupSuite() {
 		log.Fatalf("failed starting minio container: %s", err)
 	}
 	l.natsContainer = nContainer
+
+	aContainer, err := _helper.StartAuthServiceContainer(l.ctx, l.network.Name, viper.GetString("container.auth_service_version"))
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting auth service container: %s", err)
+	}
+	l.authContainer = aContainer
 
 	fContainer, err := _helper.StartFileServiceContainer(l.ctx, l.network.Name, viper.GetString("container.file_service_version"))
 	if err != nil {
@@ -119,14 +125,6 @@ func (l *LoginITSuite) SetupSuite() {
 	}
 	l.mailHogContainer = mailContainer
 
-	container := bootstrap.Run()
-	serverReady := make(chan bool)
-	server := &server.Server{
-		Container:   container,
-		ServerReady: serverReady,
-	}
-	go server.Run()
-	<-serverReady
 }
 
 func (l *LoginITSuite) TearDownSuite() {
@@ -145,6 +143,9 @@ func (l *LoginITSuite) TearDownSuite() {
 	if err := l.natsContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
 	}
+	if err := l.authContainer.Terminate(l.ctx); err != nil {
+		log.Fatalf("error terminating auth service container: %s", err)
+	}
 	if err := l.userServiceContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
 	}
@@ -157,8 +158,6 @@ func (l *LoginITSuite) TearDownSuite() {
 	if err := l.mailHogContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating mailhog container: %s", err)
 	}
-	p, _ := os.FindProcess(syscall.Getpid())
-	_ = p.Signal(syscall.SIGINT)
 	log.Println("Tear Down integration test suite for LoginITSuite")
 }
 func TestLoginITSuite(t *testing.T) {
@@ -184,7 +183,7 @@ func (l *LoginITSuite) TestLoginIT_Success() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", l.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -236,7 +235,7 @@ func (l *LoginITSuite) TestLoginIT_Success2FA() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", l.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -274,7 +273,7 @@ func (l *LoginITSuite) TestLoginIT_Success2FA() {
 	l.True(ok, "expected jwt token in data field")
 
 	// verify token
-	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify", nil)
+	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify", nil)
 	l.NoError(err)
 	verifyReq.Header.Set("Authorization", "Bearer "+jwt)
 
@@ -299,7 +298,7 @@ func (l *LoginITSuite) TestLoginIT_Success2FA() {
 	_ = formWriter.WriteField("two_factor_enabled", "true")
 	formWriter.Close()
 
-	request, err = http.NewRequest(http.MethodPatch, "http://localhost:8182/", reqBody)
+	request, err = http.NewRequest(http.MethodPatch, "http://localhost:8082/", reqBody)
 	request.Header.Set("Content-Type", formWriter.FormDataContentType())
 	request.Header.Set("User-Data", userDataHeader)
 
@@ -344,7 +343,7 @@ func (l *LoginITSuite) TestLoginIT_Success2FA() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/verify-otp", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/verify-otp", reqBody)
 	l.NoError(err)
 
 	client = http.Client{}
@@ -367,7 +366,7 @@ func (l *LoginITSuite) TestLoginIT_MissingBody() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/login", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/login", reqBody)
 	l.NoError(err)
 
 	client := http.Client{}
@@ -434,7 +433,7 @@ func (l *LoginITSuite) TestLoginIT_PasswordDoesntMatch() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", l.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -460,7 +459,7 @@ func (l *LoginITSuite) TestLoginIT_PasswordDoesntMatch() {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/login", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/login", reqBody)
 	l.NoError(err)
 
 	client = http.Client{}

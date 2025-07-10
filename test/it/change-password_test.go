@@ -9,16 +9,11 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"os/exec"
 	"regexp"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/dropboks/auth-service/cmd/bootstrap"
-	"github.com/dropboks/auth-service/cmd/server"
-	"github.com/dropboks/auth-service/config/env"
 	"github.com/dropboks/auth-service/test/helper"
 	_helper "github.com/dropboks/sharedlib/test/helper"
 	"github.com/gin-gonic/gin"
@@ -37,6 +32,7 @@ type ChangePasswordITSuite struct {
 	redisContainer               *_helper.RedisContainer
 	minioContainer               *_helper.MinioContainer
 	natsContainer                *_helper.NatsContainer
+	authContainer                *_helper.AuthServiceContainer
 	userServiceContainer         *_helper.UserServiceContainer
 	fileServiceContainer         *_helper.FileServiceContainer
 	notificationServiceContainer *_helper.NotificationServiceContainer
@@ -48,22 +44,25 @@ func (c *ChangePasswordITSuite) SetupSuite() {
 	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for ChangePasswordITSuite")
 	c.ctx = context.Background()
-	gin.SetMode(gin.TestMode)
-	os.Setenv("ENV", "test")
-	env.Load()
 
+	viper.SetConfigName("config.test")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("../../")
+	if err := viper.ReadInConfig(); err != nil {
+		panic("failed to read config")
+	}
 	// spawn sharedNetwork
 	c.network = _helper.StartNetwork(c.ctx)
 
 	// spawn user db
-	userPgContainer, err := _helper.StartPostgresContainer(c.ctx, c.network.Name, "user_db", "5432", viper.GetString("container.postgresql_version"))
+	userPgContainer, err := _helper.StartPostgresContainer(c.ctx, c.network.Name, "user_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	c.userPgContainer = userPgContainer
 
 	// spawn auth db
-	authPgContainer, err := _helper.StartPostgresContainer(c.ctx, c.network.Name, "auth_db", "5433", viper.GetString("container.postgresql_version"))
+	authPgContainer, err := _helper.StartPostgresContainer(c.ctx, c.network.Name, "auth_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
@@ -88,6 +87,13 @@ func (c *ChangePasswordITSuite) SetupSuite() {
 		log.Fatalf("failed starting minio container: %s", err)
 	}
 	c.natsContainer = nContainer
+
+	aContainer, err := _helper.StartAuthServiceContainer(c.ctx, c.network.Name, viper.GetString("container.auth_service_version"))
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting auth service container: %s", err)
+	}
+	c.authContainer = aContainer
 
 	fContainer, err := _helper.StartFileServiceContainer(c.ctx, c.network.Name, viper.GetString("container.file_service_version"))
 	if err != nil {
@@ -117,14 +123,6 @@ func (c *ChangePasswordITSuite) SetupSuite() {
 	}
 	c.mailHogContainer = mailContainer
 
-	container := bootstrap.Run()
-	serverReady := make(chan bool)
-	server := &server.Server{
-		Container:   container,
-		ServerReady: serverReady,
-	}
-	go server.Run()
-	<-serverReady
 }
 func (c *ChangePasswordITSuite) TearDownSuite() {
 	if err := c.userPgContainer.Terminate(c.ctx); err != nil {
@@ -142,6 +140,9 @@ func (c *ChangePasswordITSuite) TearDownSuite() {
 	if err := c.natsContainer.Terminate(c.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
 	}
+	if err := c.authContainer.Terminate(c.ctx); err != nil {
+		log.Fatalf("error terminating auth service container: %s", err)
+	}
 	if err := c.userServiceContainer.Terminate(c.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
 	}
@@ -154,9 +155,6 @@ func (c *ChangePasswordITSuite) TearDownSuite() {
 	if err := c.mailHogContainer.Terminate(c.ctx); err != nil {
 		log.Fatalf("error terminating mailhog container: %s", err)
 	}
-
-	p, _ := os.FindProcess(syscall.Getpid())
-	_ = p.Signal(syscall.SIGINT)
 	log.Println("Tear Down integration test suite for ChangePasswordITSuite")
 }
 func TestChangePasswordITSuite(t *testing.T) {
@@ -182,7 +180,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_Success() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", c.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -207,7 +205,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_Success() {
 	}
 	_ = json.NewEncoder(body).Encode(encoder)
 
-	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8181/reset-password", body)
+	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8081/reset-password", body)
 	c.NoError(err)
 
 	resetResponse, err := client.Do(resetRequest)
@@ -220,7 +218,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_Success() {
 	c.Contains(string(resetBody), "Reset password email has been sent")
 
 	// check email
-	regex = `http://localhost:8181/change-password\?userid=[^&]+&resetPasswordToken=[^"']+`
+	regex = `http://localhost:8081/change-password\?userid=[^&]+&resetPasswordToken=[^"']+`
 	resetLink := helper.RetrieveDataFromEmail(email, regex, "mail", c.T())
 	c.NotEmpty(resetLink)
 
@@ -254,7 +252,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_MissingQuery() {
 		"confirm_password": "password12345",
 	}
 	_ = json.NewEncoder(body).Encode(encoder)
-	changePasswordReq, err := http.NewRequest(http.MethodPatch, `http://localhost:8181/change-password?`, body)
+	changePasswordReq, err := http.NewRequest(http.MethodPatch, `http://localhost:8081/change-password?`, body)
 	c.NoError(err)
 
 	client := http.Client{}
@@ -275,7 +273,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_MissingBody() {
 		"password": "password12345",
 	}
 	_ = json.NewEncoder(body).Encode(encoder)
-	changePasswordReq, err := http.NewRequest(http.MethodPatch, `http://localhost:8181/change-password?userid=valid-user-id&resetPasswordToken=valid-reset-password-token`, body)
+	changePasswordReq, err := http.NewRequest(http.MethodPatch, `http://localhost:8081/change-password?userid=valid-user-id&resetPasswordToken=valid-reset-password-token`, body)
 	c.NoError(err)
 
 	client := http.Client{}
@@ -308,7 +306,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_InvalidToken() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", c.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -333,7 +331,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_InvalidToken() {
 	}
 	_ = json.NewEncoder(body).Encode(encoder)
 
-	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8181/reset-password", body)
+	resetRequest, err := http.NewRequest(http.MethodPost, "http://localhost:8081/reset-password", body)
 	c.NoError(err)
 
 	resetResponse, err := client.Do(resetRequest)
@@ -346,7 +344,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_InvalidToken() {
 	c.Contains(string(resetBody), "Reset password email has been sent")
 
 	// check email
-	regex = `http://localhost:8181/change-password\?userid=[^&]+&resetPasswordToken=[^"']+`
+	regex = `http://localhost:8081/change-password\?userid=[^&]+&resetPasswordToken=[^"']+`
 	resetLink := helper.RetrieveDataFromEmail(email, regex, "mail", c.T())
 	c.NotEmpty(resetLink)
 
@@ -384,7 +382,7 @@ func (c *ChangePasswordITSuite) TestChangePasswordIT_NotFound() {
 		"confirm_password": "password12345",
 	}
 	_ = json.NewEncoder(body).Encode(encoder)
-	changePasswordReq, err := http.NewRequest(http.MethodPatch, "http://localhost:8181/change-password?userid=invalid-userid&resetPasswordToken=valid-token", body)
+	changePasswordReq, err := http.NewRequest(http.MethodPatch, "http://localhost:8081/change-password?userid=invalid-userid&resetPasswordToken=valid-token", body)
 	c.NoError(err)
 
 	client := http.Client{}

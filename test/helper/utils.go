@@ -26,7 +26,7 @@ func Login(email string, t *testing.T) *http.Request {
 	}
 	_ = json.NewEncoder(reqBody).Encode(encoder)
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8181/login", reqBody)
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8081/login", reqBody)
 	assert.NoError(t, err)
 	return req
 }
@@ -47,7 +47,7 @@ func Register(email string, t *testing.T) *http.Request {
 	}
 	formWriter.Close()
 
-	request, err := http.NewRequest(http.MethodPost, "http://localhost:8181/register", reqBody)
+	request, err := http.NewRequest(http.MethodPost, "http://localhost:8081/register", reqBody)
 	request.Header.Set("Content-Type", formWriter.FormDataContentType())
 
 	assert.NoError(t, err)

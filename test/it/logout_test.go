@@ -7,20 +7,14 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/dropboks/auth-service/cmd/bootstrap"
-	"github.com/dropboks/auth-service/cmd/server"
-	"github.com/dropboks/auth-service/config/env"
 	"github.com/spf13/viper"
 
 	"github.com/dropboks/auth-service/test/helper"
 	_helper "github.com/dropboks/sharedlib/test/helper"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -35,6 +29,7 @@ type LogoutITSuite struct {
 	redisContainer               *_helper.RedisContainer
 	minioContainer               *_helper.MinioContainer
 	natsContainer                *_helper.NatsContainer
+	authContainer                *_helper.AuthServiceContainer
 	userServiceContainer         *_helper.UserServiceContainer
 	fileServiceContainer         *_helper.FileServiceContainer
 	notificationServiceContainer *_helper.NotificationServiceContainer
@@ -47,22 +42,26 @@ func (l *LogoutITSuite) SetupSuite() {
 	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for LogoutITSuite")
 	l.ctx = context.Background()
-	gin.SetMode(gin.TestMode)
-	os.Setenv("ENV", "test")
-	env.Load()
+
+	viper.SetConfigName("config.test")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("../../")
+	if err := viper.ReadInConfig(); err != nil {
+		panic("failed to read config")
+	}
 
 	// spawn sharedNetwork
 	l.network = _helper.StartNetwork(l.ctx)
 
 	// spawn user db
-	userPgContainer, err := _helper.StartPostgresContainer(l.ctx, l.network.Name, "user_db", "5432", viper.GetString("container.postgresql_version"))
+	userPgContainer, err := _helper.StartPostgresContainer(l.ctx, l.network.Name, "user_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	l.userPgContainer = userPgContainer
 
 	// spawn auth db
-	authPgContainer, err := _helper.StartPostgresContainer(l.ctx, l.network.Name, "auth_db", "5433", viper.GetString("container.postgresql_version"))
+	authPgContainer, err := _helper.StartPostgresContainer(l.ctx, l.network.Name, "auth_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
@@ -87,6 +86,13 @@ func (l *LogoutITSuite) SetupSuite() {
 		log.Fatalf("failed starting minio container: %s", err)
 	}
 	l.natsContainer = nContainer
+
+	aContainer, err := _helper.StartAuthServiceContainer(l.ctx, l.network.Name, viper.GetString("container.auth_service_version"))
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting auth service container: %s", err)
+	}
+	l.authContainer = aContainer
 
 	fContainer, err := _helper.StartFileServiceContainer(l.ctx, l.network.Name, viper.GetString("container.file_service_version"))
 	if err != nil {
@@ -116,14 +122,6 @@ func (l *LogoutITSuite) SetupSuite() {
 	}
 	l.mailHogContainer = mailContainer
 
-	container := bootstrap.Run()
-	serverReady := make(chan bool)
-	server := &server.Server{
-		Container:   container,
-		ServerReady: serverReady,
-	}
-	go server.Run()
-	<-serverReady
 }
 func (l *LogoutITSuite) TearDownSuite() {
 	if err := l.userPgContainer.Terminate(l.ctx); err != nil {
@@ -141,6 +139,9 @@ func (l *LogoutITSuite) TearDownSuite() {
 	if err := l.natsContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
 	}
+	if err := l.authContainer.Terminate(l.ctx); err != nil {
+		log.Fatalf("error terminating auth service container: %s", err)
+	}
 	if err := l.userServiceContainer.Terminate(l.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
 	}
@@ -154,8 +155,6 @@ func (l *LogoutITSuite) TearDownSuite() {
 		log.Fatalf("error terminating mailhog container: %s", err)
 	}
 
-	p, _ := os.FindProcess(syscall.Getpid())
-	_ = p.Signal(syscall.SIGINT)
 	log.Println("Tear Down integration test suite for LogoutITSuite")
 }
 func TestLogoutITSuite(t *testing.T) {
@@ -181,7 +180,7 @@ func (l *LogoutITSuite) TestLogoutIT_Success() {
 	time.Sleep(time.Second) //give a time for auth_db update the user
 
 	// verify email
-	regex := `http://localhost:8181/verify-email\?userid=[^&]+&token=[^"']+`
+	regex := `http://localhost:8081/verify-email\?userid=[^&]+&token=[^"']+`
 	link := helper.RetrieveDataFromEmail(email, regex, "mail", l.T())
 
 	verifyRequest, err := http.NewRequest(http.MethodGet, link, nil)
@@ -218,7 +217,7 @@ func (l *LogoutITSuite) TestLogoutIT_Success() {
 	jwt, ok := respData["data"].(string)
 	l.True(ok, "expected jwt token in data field")
 
-	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/logout", nil)
+	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8081/logout", nil)
 	l.NoError(err)
 	verifyReq.Header.Set("Authorization", "Bearer "+jwt)
 
@@ -231,7 +230,7 @@ func (l *LogoutITSuite) TestLogoutIT_Success() {
 
 func (l *LogoutITSuite) TestLogoutIT_MissingToken() {
 
-	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/logout", nil)
+	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8081/logout", nil)
 	l.NoError(err)
 
 	client := http.Client{}
@@ -247,7 +246,7 @@ func (l *LogoutITSuite) TestLogoutIT_MissingToken() {
 
 func (l *LogoutITSuite) TestLogoutIT_InvalidFormat() {
 
-	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/logout", nil)
+	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8081/logout", nil)
 	verifyReq.Header.Set("Authorization", "Bearer")
 	l.NoError(err)
 
@@ -265,7 +264,7 @@ func (l *LogoutITSuite) TestLogoutIT_InvalidFormat() {
 func (l *LogoutITSuite) TestLogoutIT_InvalidToken() {
 	jwt := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoidXNlci1pZC0xMjMiLCJpYXQiOjE3NTEzNjEzOTJ9.CwkzkHgPYAxd6TXG4_ooMFczGvjn3Qr2_7T6W6YCDgI"
 
-	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8181/logout", nil)
+	verifyReq, err := http.NewRequest(http.MethodPost, "http://localhost:8081/logout", nil)
 	verifyReq.Header.Set("Authorization", "Bearer "+jwt)
 	l.NoError(err)
 

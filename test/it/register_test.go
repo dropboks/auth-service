@@ -8,20 +8,14 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/dropboks/auth-service/cmd/bootstrap"
-	"github.com/dropboks/auth-service/cmd/server"
-	"github.com/dropboks/auth-service/config/env"
 	"github.com/spf13/viper"
 
 	"github.com/dropboks/auth-service/test/helper"
 	_helper "github.com/dropboks/sharedlib/test/helper"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )
@@ -36,6 +30,7 @@ type RegisterITSuite struct {
 	redisContainer       *_helper.RedisContainer
 	minioContainer       *_helper.MinioContainer
 	natsContainer        *_helper.NatsContainer
+	authContainer        *_helper.AuthServiceContainer
 	userServiceContainer *_helper.UserServiceContainer
 	fileServiceContainer *_helper.FileServiceContainer
 }
@@ -45,22 +40,26 @@ func (r *RegisterITSuite) SetupSuite() {
 	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for RegisterITSuite")
 	r.ctx = context.Background()
-	gin.SetMode(gin.TestMode)
-	os.Setenv("ENV", "test")
-	env.Load()
+
+	viper.SetConfigName("config.test")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("../../")
+	if err := viper.ReadInConfig(); err != nil {
+		panic("failed to read config")
+	}
 
 	// spawn sharedNetwork
 	r.network = _helper.StartNetwork(r.ctx)
 
 	// spawn user db
-	userPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", "5432", viper.GetString("container.postgresql_version"))
+	userPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "user_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
 	r.userPgContainer = userPgContainer
 
 	// spawn auth db
-	authPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", "5433", viper.GetString("container.postgresql_version"))
+	authPgContainer, err := _helper.StartPostgresContainer(r.ctx, r.network.Name, "auth_db", viper.GetString("container.postgresql_version"))
 	if err != nil {
 		log.Fatalf("failed starting postgres container: %s", err)
 	}
@@ -86,6 +85,13 @@ func (r *RegisterITSuite) SetupSuite() {
 	}
 	r.natsContainer = nContainer
 
+	aContainer, err := _helper.StartAuthServiceContainer(r.ctx, r.network.Name, viper.GetString("container.auth_service_version"))
+	if err != nil {
+		log.Println("make sure the image is exist")
+		log.Fatalf("failed starting auth service container: %s", err)
+	}
+	r.authContainer = aContainer
+
 	fContainer, err := _helper.StartFileServiceContainer(r.ctx, r.network.Name, viper.GetString("container.file_service_version"))
 	if err != nil {
 		log.Println("make sure the image is exist")
@@ -100,15 +106,6 @@ func (r *RegisterITSuite) SetupSuite() {
 		log.Fatalf("failed starting user service container: %s", err)
 	}
 	r.userServiceContainer = uContainer
-
-	container := bootstrap.Run()
-	serverReady := make(chan bool)
-	server := &server.Server{
-		Container:   container,
-		ServerReady: serverReady,
-	}
-	go server.Run()
-	<-serverReady
 }
 func (r *RegisterITSuite) TearDownSuite() {
 	if err := r.userPgContainer.Terminate(r.ctx); err != nil {
@@ -126,6 +123,9 @@ func (r *RegisterITSuite) TearDownSuite() {
 	if err := r.natsContainer.Terminate(r.ctx); err != nil {
 		log.Fatalf("error terminating nats container: %s", err)
 	}
+	if err := r.authContainer.Terminate(r.ctx); err != nil {
+		log.Fatalf("error terminating auth service container: %s", err)
+	}
 	if err := r.userServiceContainer.Terminate(r.ctx); err != nil {
 		log.Fatalf("error terminating user service container: %s", err)
 	}
@@ -133,8 +133,6 @@ func (r *RegisterITSuite) TearDownSuite() {
 		log.Fatalf("error terminating file service container: %s", err)
 	}
 
-	p, _ := os.FindProcess(syscall.Getpid())
-	_ = p.Signal(syscall.SIGINT)
 	log.Println("Tear Down integration test suite for RegisterITSuite")
 }
 func TestRegisterITSuite(t *testing.T) {
@@ -166,7 +164,7 @@ func (r *RegisterITSuite) TestRegisterIT_MissingBody() {
 
 	formWriter.Close()
 
-	request, err := http.NewRequest(http.MethodPost, "http://localhost:8181/register", reqBody)
+	request, err := http.NewRequest(http.MethodPost, "http://localhost:8081/register", reqBody)
 	request.Header.Set("Content-Type", formWriter.FormDataContentType())
 	r.NoError(err)
 
@@ -230,7 +228,7 @@ func (r *RegisterITSuite) TestRegisterIT_WrongExtension() {
 	}
 	formWriter.Close()
 
-	request, err := http.NewRequest(http.MethodPost, "http://localhost:8181/register", reqBody)
+	request, err := http.NewRequest(http.MethodPost, "http://localhost:8081/register", reqBody)
 	request.Header.Set("Content-Type", formWriter.FormDataContentType())
 	r.NoError(err)
 
@@ -263,7 +261,7 @@ func (r *RegisterITSuite) TestRegisterIT_LimitSizeExceeded() {
 	}
 	formWriter.Close()
 
-	request, err := http.NewRequest(http.MethodPost, "http://localhost:8181/register", reqBody)
+	request, err := http.NewRequest(http.MethodPost, "http://localhost:8081/register", reqBody)
 	request.Header.Set("Content-Type", formWriter.FormDataContentType())
 	r.NoError(err)
 
@@ -296,7 +294,7 @@ func (r *RegisterITSuite) TestRegisterIT_PasswordAndConfirmPasswordDoesntMatch()
 	}
 	formWriter.Close()
 
-	request, err := http.NewRequest(http.MethodPost, "http://localhost:8181/register", reqBody)
+	request, err := http.NewRequest(http.MethodPost, "http://localhost:8081/register", reqBody)
 	request.Header.Set("Content-Type", formWriter.FormDataContentType())
 	r.NoError(err)
 
