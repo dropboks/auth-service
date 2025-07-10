@@ -1,39 +1,39 @@
 database:
-  host: "localhost"
+  host: "auth_db"
   user: "user_test"
   password: "password_test"
-  port: "5433"
+  port: "5432"
   name: "testdb"
   sslmode: "disable"
 
 app:
   name: "test_app_name"
-  url: "http://localhost:8181"
+  url: "http://localhost:8081"
   http:
-    port: 8181
+    port: 8081
   grpc:
     service:
-      user_service: 127.0.0.1:50051
-      file_service: 127.0.0.1:50052
+      user_service: user_service:50051
+      file_service: file_service:50051
   verification_url: "verify-email?"
   changepassword_url: "change-password?"
 
 redis:
-  address: "localhost"
+  address: "redis"
   port: "6379"
   client_name: "auth_service_test"
   password: "password_test"
 
 minio:
-  host: "localhost"
-  port: 9000
+  host: "minio"
+  port: "9000"
   credential:
     user: "user_test"
     password: "password_test"
 
 nats:
   protocol: "nats"
-  address: "localhost"
+  address: "nats"
   port: "4221"
   credential:
     user: "user_test"
@@ -73,6 +73,7 @@ jwt:
   secret_key: "jwt_secret_test"
 
 container:
+  auth_service_version: "v0.0.1"
   file_service_version: "v0.0.1"
   user_service_version: "v0.0.1"
   notification_service_version: "v0.0.1"
