@@ -9,7 +9,6 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -41,8 +40,6 @@ type ResendVerificationOTPITSuite struct {
 }
 
 func (r *ResendVerificationOTPITSuite) SetupSuite() {
-	exec.Command("docker", "rm", "-f", "user_db").Run()
-	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for ResendVerificationOTPITSuite")
 	r.ctx = context.Background()
 

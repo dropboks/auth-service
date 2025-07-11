@@ -9,7 +9,6 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -42,8 +41,6 @@ type LoginITSuite struct {
 
 func (l *LoginITSuite) SetupSuite() {
 
-	exec.Command("docker", "rm", "-f", "user_db").Run()
-	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for LoginITSuite")
 	l.ctx = context.Background()
 

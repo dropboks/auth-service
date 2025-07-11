@@ -9,7 +9,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"os/exec"
 	"regexp"
 	"testing"
 	"time"
@@ -40,8 +39,6 @@ type ChangePasswordITSuite struct {
 }
 
 func (c *ChangePasswordITSuite) SetupSuite() {
-	exec.Command("docker", "rm", "-f", "user_db").Run()
-	exec.Command("docker", "rm", "-f", "auth_db").Run()
 	log.Println("Setting up integration test suite for ChangePasswordITSuite")
 	c.ctx = context.Background()
 

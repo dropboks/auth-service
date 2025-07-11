@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os/exec"
 	"regexp"
 	"testing"
 	"time"
@@ -41,9 +40,6 @@ type VerifyEmailITSuite struct {
 }
 
 func (v *VerifyEmailITSuite) SetupSuite() {
-	exec.Command("docker", "rm", "-f", "user_db").Run()
-	exec.Command("docker", "rm", "-f", "auth_db").Run()
-
 	log.Println("Setting up integration test suite for VerifyEmailITSuite")
 	v.ctx = context.Background()
 

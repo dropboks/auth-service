@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -37,9 +36,6 @@ type VerifyITSuite struct {
 }
 
 func (v *VerifyITSuite) SetupSuite() {
-	exec.Command("docker", "rm", "-f", "user_db").Run()
-	exec.Command("docker", "rm", "-f", "auth_db").Run()
-
 	log.Println("Setting up integration test suite for VerifyITSuite")
 	v.ctx = context.Background()
 
