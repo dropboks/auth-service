@@ -82,3 +82,7 @@ container:
   mailhog_version: "v1.0.1"
   postgresql_version: "17.5-alpine3.22"
   redis_version : "7.2"
+
+script:
+  nats_server: "../mocks/nats/nats-server.conf"
+  init_sql: "../mocks/db/init-db.sql"
