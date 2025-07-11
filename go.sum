@@ -60,6 +60,8 @@ github.com/dropboks/proto-user v0.0.0-20250709010613-66c877f96ac7 h1:sOJuKl07il+
 github.com/dropboks/proto-user v0.0.0-20250709010613-66c877f96ac7/go.mod h1:Pj6/JS3foqIt7xuA+33mhrYt/4OmUjKS+7Jt0gx8YQw=
 github.com/dropboks/sharedlib v0.0.0-20250711030659-d18f392260e1 h1:oG9B2z6GuDplYISOxsbXyDl3lJKrMZXh9bJ7nj4NPqE=
 github.com/dropboks/sharedlib v0.0.0-20250711030659-d18f392260e1/go.mod h1:u2QdVSIFAJJ1LxZtoBOYfUD/K4aq8qYu7tkXgxvDj84=
+github.com/dropboks/sharedlib v0.0.0-20250711072608-b2ae226cfddf h1:PpWBcGhMrL51DX+BSwGN3wOFSQyWQ+Oxej60ENBnjhE=
+github.com/dropboks/sharedlib v0.0.0-20250711072608-b2ae226cfddf/go.mod h1:u2QdVSIFAJJ1LxZtoBOYfUD/K4aq8qYu7tkXgxvDj84=
 github.com/ebitengine/purego v0.8.4 h1:CF7LEKg5FFOsASUj0+QwaXf8Ht6TlFxg09+S9wz0omw=
 github.com/ebitengine/purego v0.8.4/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=

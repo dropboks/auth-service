@@ -7,7 +7,7 @@ require (
 	github.com/dropboks/event-bus-client v0.0.0-20250708092155-e109e3ad4b52
 	github.com/dropboks/proto-file v0.0.0-20250609044313-a7f78b2c48bf
 	github.com/dropboks/proto-user v0.0.0-20250709010613-66c877f96ac7
-	github.com/dropboks/sharedlib v0.0.0-20250711030659-d18f392260e1
+	github.com/dropboks/sharedlib v0.0.0-20250711072608-b2ae226cfddf
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
