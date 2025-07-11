@@ -5,9 +5,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/dropboks/auth-service/internal/domain/handler"
@@ -19,16 +16,16 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
-	"github.com/spf13/viper"
 	"go.uber.org/dig"
 )
 
 type Server struct {
 	Container   *dig.Container
 	ServerReady chan bool
+	Address     string
 }
 
-func (s *Server) Run() {
+func (s *Server) Run(ctx context.Context) {
 	err := s.Container.Invoke(
 		func(
 			logger zerolog.Logger,
@@ -49,10 +46,9 @@ func (s *Server) Run() {
 			router.Use(gin.Recovery())
 			handler.AuthRoutes(router, ah)
 			srv := &http.Server{
-				Addr:    ":" + viper.GetString("app.http.port"),
+				Addr:    s.Address,
 				Handler: router,
 			}
-			logger.Info().Msgf("HTTP Server Starting in port %s", viper.GetString("app.http.port"))
 
 			go func() {
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -63,9 +59,11 @@ func (s *Server) Run() {
 			// init consumer here
 			go ue.StartConsume()
 
+			logger.Info().Msgf("HTTP Server Starting in port %s", s.Address)
+
 			if s.ServerReady != nil {
 				for range 50 {
-					conn, err := net.DialTimeout("tcp", ":"+viper.GetString("app.http.port"), 100*time.Millisecond)
+					conn, err := net.DialTimeout("tcp", s.Address, 100*time.Millisecond)
 					if err == nil {
 						conn.Close()
 						s.ServerReady <- true
@@ -75,10 +73,7 @@ func (s *Server) Run() {
 				}
 			}
 
-			quit := make(chan os.Signal, 1)
-			signal.Notify(quit, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGTERM)
-
-			<-quit
+			<-ctx.Done()
 			logger.Info().Msg("Shutting down server...")
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
